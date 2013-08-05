@@ -1,0 +1,51 @@
+<RCC>
+    <qresource prefix="/Quneo/images">
+        <file>resources/images/padHighlight.png</file>
+        <file>resources/images/quneophotoshop2gray.png</file>
+        <file>resources/images/horizontalSliderHighlight.png</file>
+        <file>resources/images/longSliderHighlight.png</file>
+        <file>resources/images/rotaryHighlight.png</file>
+        <file>resources/images/vSliderHighlight.png</file>
+        <file>resources/images/padTransparent.png</file>
+        <file>resources/images/highlightButton8.png</file>
+        <file>resources/images/highlightButton3.png</file>
+        <file>resources/images/highlightButton2.png</file>
+        <file>resources/images/highlightButton1.png</file>
+        <file>resources/images/highlightButton0.png</file>
+        <file>resources/images/highlightButton9.png</file>
+        <file>resources/images/highlightButton4.png</file>
+        <file>resources/images/backgroundQuneo.png</file>
+        <file>resources/images/kmilogo.png</file>
+        <file>resources/images/quneoLabel.png</file>
+        <file>resources/images/backgroundQuneo2.png</file>
+        <file>resources/images/tables/Medium.png</file>
+        <file>resources/images/tables/Light.png</file>
+        <file>resources/images/tables/None.png</file>
+        <file>resources/images/tables/Dynamic.png</file>
+        <file>resources/images/tables/Hard.png</file>
+        <file>resources/images/tables/Full Level.png</file>
+    </qresource>
+    <qresource prefix="/Quneo/sysex">
+        <file>resources/sysex/Quneo.syx</file>
+        <file>resources/sysex/Quneo_Enter_Bootloader.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset15.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset0.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset1.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset2.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset3.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset4.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset5.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset6.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset7.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset8.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset9.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset10.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset11.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset12.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset13.syx</file>
+        <file>resources/sysex/loadPresets/loadPreset14.syx</file>
+    </qresource>
+    <qresource prefix="/Quneo/preset">
+        <file>resources/blank.quneopreset</file>
+    </qresource>
+</RCC>
