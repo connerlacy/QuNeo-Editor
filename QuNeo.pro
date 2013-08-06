@@ -129,11 +129,16 @@ LIBS += -framework Cocoa
 LIBS += -framework CoreServices
 }
 
-unix{
+unix:!macx{
 INCLUDEPATH += ./midi/rtmidi
-HEADERS += midi/rtmidi/midideviceaccess.h midi/rtmidi/rtmidi.h
-SOURCES  += midi/rtmidi/midideviceaccess.cpp midi/rtmidi/rtmidi.cpp
+HEADERS += midi/rtmidi/midideviceaccess.h midi/rtmidi/RtMidi.h
+SOURCES  += midi/rtmidi/midideviceaccess.cpp midi/rtmidi/RtMidi.cpp
+LIBS += -ljack
+LIBS += -lasound
+DEFINES += __UNIX_JACK__
+DEFINES += __LINUX_ALSA__
 }
+
 
 #------OS Specific ICONS-------#
 

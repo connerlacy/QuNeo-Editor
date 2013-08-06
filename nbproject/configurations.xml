@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="89">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <df root="." name="0">
+      <df name="data">
+        <in>copypastehandler.cpp</in>
+        <in>datavalidator.cpp</in>
+        <in>presethandler.cpp</in>
+      </df>
+      <df name="midi">
+        <df name="rtmidi">
+          <in>RtMidi.cpp</in>
+          <in>midideviceaccess.cpp</in>
+        </df>
+        <in>sysexformat.cpp</in>
+      </df>
+      <df name="qjson">
+        <df name="src">
+          <in>json_parser.cc</in>
+          <in>json_scanner.cpp</in>
+          <in>parser.cpp</in>
+          <in>qobjecthelper.cpp</in>
+          <in>serializer.cpp</in>
+        </df>
+      </df>
+      <df name="ui">
+        <df name="buttons">
+          <in>buttonbutton.cpp</in>
+          <in>hsliderbutton.cpp</in>
+          <in>lsliderbutton.cpp</in>
+          <in>padbutton.cpp</in>
+          <in>rotarybutton.cpp</in>
+          <in>vsliderbutton.cpp</in>
+        </df>
+        <df name="editPanes">
+          <in>globalparameters.cpp</in>
+          <in>hslidereditpane.cpp</in>
+          <in>leftrighteditpane.cpp</in>
+          <in>lslidereditpane.cpp</in>
+          <in>modeeditpane.cpp</in>
+          <in>padeditpane.cpp</in>
+          <in>rhombuseditpane.cpp</in>
+          <in>rotaryeditpane.cpp</in>
+          <in>transporteditpane.cpp</in>
+          <in>updowneditpane.cpp</in>
+          <in>vslidereditpane.cpp</in>
+        </df>
+        <df name="labels">
+          <in>hsliderlabels.cpp</in>
+          <in>leftrightlabels.cpp</in>
+          <in>lsliderlabels.cpp</in>
+          <in>modelabels.cpp</in>
+          <in>padlabels.cpp</in>
+          <in>rhombuslabels.cpp</in>
+          <in>rotarylabels.cpp</in>
+          <in>transportlabels.cpp</in>
+          <in>updateindicator.cpp</in>
+          <in>updownlabels.cpp</in>
+          <in>vsliderlabels.cpp</in>
+        </df>
+      </df>
+      <in>main.cpp</in>
+      <in>mainwindow.cpp</in>
+      <in>moc_buttonbutton.cpp</in>
+      <in>moc_copypastehandler.cpp</in>
+      <in>moc_datavalidator.cpp</in>
+      <in>moc_globalparameters.cpp</in>
+      <in>moc_hsliderbutton.cpp</in>
+      <in>moc_hslidereditpane.cpp</in>
+      <in>moc_hsliderlabels.cpp</in>
+      <in>moc_leftrighteditpane.cpp</in>
+      <in>moc_leftrightlabels.cpp</in>
+      <in>moc_lsliderbutton.cpp</in>
+      <in>moc_lslidereditpane.cpp</in>
+      <in>moc_lsliderlabels.cpp</in>
+      <in>moc_mainwindow.cpp</in>
+      <in>moc_midideviceaccess.cpp</in>
+      <in>moc_modeeditpane.cpp</in>
+      <in>moc_modelabels.cpp</in>
+      <in>moc_padbutton.cpp</in>
+      <in>moc_padeditpane.cpp</in>
+      <in>moc_padlabels.cpp</in>
+      <in>moc_presethandler.cpp</in>
+      <in>moc_rhombuseditpane.cpp</in>
+      <in>moc_rhombuslabels.cpp</in>
+      <in>moc_rotarybutton.cpp</in>
+      <in>moc_rotaryeditpane.cpp</in>
+      <in>moc_rotarylabels.cpp</in>
+      <in>moc_sysexformat.cpp</in>
+      <in>moc_transporteditpane.cpp</in>
+      <in>moc_transportlabels.cpp</in>
+      <in>moc_updateindicator.cpp</in>
+      <in>moc_updowneditpane.cpp</in>
+      <in>moc_updownlabels.cpp</in>
+      <in>moc_vsliderbutton.cpp</in>
+      <in>moc_vslidereditpane.cpp</in>
+      <in>moc_vsliderlabels.cpp</in>
+      <in>qrc_Resources.cpp</in>
+    </df>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+      <itemPath>QuNeo.pro</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceFolderFilter>^(nbproject)$</sourceFolderFilter>
+  <sourceRootList>
+    <Elem>.</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>false</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <codeAssistance>
+      </codeAssistance>
+      <makefileType>
+        <makeTool>
+          <buildCommandWorkingDir>.</buildCommandWorkingDir>
+          <buildCommand>${MAKE} -j7 -f Makefile</buildCommand>
+          <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
+          <executablePath>QuNeo Editor</executablePath>
+          <ccTool>
+            <incDir>
+              <pElem>/usr/share/qt4/mkspecs/linux-g++-64</pElem>
+              <pElem>.</pElem>
+              <pElem>/usr/include/qt4/QtCore</pElem>
+              <pElem>/usr/include/qt4/QtGui</pElem>
+              <pElem>/usr/include/qt4</pElem>
+              <pElem>ui/buttons</pElem>
+              <pElem>ui/editPanes</pElem>
+              <pElem>data</pElem>
+              <pElem>midi</pElem>
+              <pElem>ui/labels</pElem>
+              <pElem>qjson/src</pElem>
+              <pElem>midi/rtmidi</pElem>
+            </incDir>
+            <preprocessorList>
+              <Elem>QT_CORE_LIB</Elem>
+              <Elem>QT_GUI_LIB</Elem>
+              <Elem>QT_NO_DEBUG</Elem>
+              <Elem>QT_SHARED</Elem>
+              <Elem>QT_WEBKIT</Elem>
+              <Elem>_REENTRANT</Elem>
+              <Elem>__LINUX_ALSA__</Elem>
+              <Elem>__UNIX_JACK__</Elem>
+            </preprocessorList>
+          </ccTool>
+        </makeTool>
+      </makefileType>
+      <item path="data/copypastehandler.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="data/datavalidator.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="data/presethandler.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="main.cpp" ex="false" tool="1" flavor2="4">
+        <ccTool>
+        </ccTool>
+      </item>
+      <item path="mainwindow.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="midi/rtmidi/RtMidi.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="midi/rtmidi/midideviceaccess.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="midi/sysexformat.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_buttonbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_copypastehandler.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_datavalidator.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_globalparameters.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_hsliderbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_hslidereditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_hsliderlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_leftrighteditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_leftrightlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_lsliderbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_lslidereditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_lsliderlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_mainwindow.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_midideviceaccess.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_modeeditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_modelabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_padbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_padeditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_padlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_presethandler.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_rhombuseditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_rhombuslabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_rotarybutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_rotaryeditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_rotarylabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_sysexformat.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_transporteditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_transportlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_updateindicator.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_updowneditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_updownlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_vsliderbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_vslidereditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="moc_vsliderlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="qjson/src/json_parser.cc" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="qjson/src/json_scanner.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="qjson/src/parser.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="qjson/src/qobjecthelper.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="qjson/src/serializer.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="qrc_Resources.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/buttons/buttonbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/buttons/hsliderbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/buttons/lsliderbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/buttons/padbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/buttons/rotarybutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/buttons/vsliderbutton.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/globalparameters.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/hslidereditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/leftrighteditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/lslidereditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/modeeditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/padeditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/rhombuseditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/rotaryeditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/transporteditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/updowneditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/editPanes/vslidereditpane.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/hsliderlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/leftrightlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/lsliderlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/modelabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/padlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/rhombuslabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/rotarylabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/transportlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/updateindicator.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/updownlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ui/labels/vsliderlabels.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>
