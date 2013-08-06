@@ -131,8 +131,8 @@ LIBS += -framework CoreServices
 
 unix{
 INCLUDEPATH += ./midi/rtmidi
-HEADERS += midi/rtmidi/midideviceaccess.h
-SOURCES  += midi/rtmidi/midideviceaccess.cpp
+HEADERS += midi/rtmidi/midideviceaccess.h midi/rtmidi/rtmidi.h
+SOURCES  += midi/rtmidi/midideviceaccess.cpp midi/rtmidi/rtmidi.cpp
 }
 
 #------OS Specific ICONS-------#

@@ -6,10 +6,15 @@
 #include <QApplication>
 #include <QObject>
 #include <vector>
+#include <string>
+#include <utility> // for pair
 #include <sysexformat.h>
+#include "RtMidi.h"
 //#include "copypastehandler.h"
 
 using std::vector;
+using std::pair;
+using std::string;
 
 class MidiDeviceAccess : public QObject
 {
@@ -46,14 +51,14 @@ public:
 //    MIDIClientRef appyClientRef; //reference to our app
 //    MIDIPortRef appyInPortRef;  //reference to our app's input port
 //    MIDIPortRef appyOutPortRef; //reference to our app's output port
-//    vector<MIDIEndpointRef> quNeoDests; //vector of endpoint destination references (our devices' input ports)
-//    vector<MIDIEndpointRef> quNeoSources; //vector of endpoint source references (our devices' output ports)
+    vector<pair<int, string> > quNeoDests; //vector of endpoint destination references (our devices' input ports)
+    vector<pair<int, string> > quNeoSources; //vector of endpoint source references (our devices' output ports)
 //    MIDIEndpointRef selectedDevice; //our currently selected device reference
 //    MIDIPacketList midiPacketList; //our list of midi packets for input
 //    MIDIPacket* midiPacket;        //pointer to a single midi packet, used as the "current packet" when iterating throuhg packet list
 
-//    ItemCount sourceCount;
-//    ItemCount destCount;
+    int sourceCount;
+    int destCount;
 
 //    //-----Internal helper functions, not necessary for SIGS/SLOTS---------//
 

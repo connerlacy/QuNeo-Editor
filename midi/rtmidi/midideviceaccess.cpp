@@ -25,11 +25,18 @@ bool firmwareSent = true;
 //determines whether device has reconnected or not
 bool deviceReconnected = true;
 
+//----Callback Declarations and Class Pointer----//
+MidiDeviceAccess* callbackPointer; //var for non class callbacks to access class
+//void getMIDINotificationVirtual(const MIDINotification *message, void *refCon); //notification of when MIDI state changes (new controllers)
+//void sysExComplete(MIDISysexSendRequest*); //called when sysex event has been completely sent
+//void incomingMidi(const MIDIPacketList *pktlist, void *readProcRefCon, void *srcConnRefCon); //called upon incoming midi with connected port
+//bool sysEx = false; //determines whether or not incomding midi is of sysEx type
 
 
 MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) :
     QObject(parent)
 {
+    //these array vals should be set to the most recent fw and bootloader version
     // versionArray[0] = 2; //bootloader LSB
     //versionArray[1] = 1; //booloader MSB
 
@@ -39,6 +46,7 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     versionArray[3] = 2; //fw MSB 2
     versionArray[4] = 1; //fw MSB 1
 
+    mainWindow = parent; //assign mainwindow to parent
 
     boardVersion = QString("Not Connected");
     editorVersion = QString("%1.%2.%3").
@@ -70,49 +78,49 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     updateAllButton = mainWindow->findChild<QPushButton *>("updateAll");
     connect(updateAllButton, SIGNAL(clicked()), this, SLOT(slotUpdateAllPresets()));
 
-//    //pointer to this instance of the class, used in callback functions which are not part of the class
+    //pointer to this instance of the class, used in callback functions which are not part of the class
     callbackPointer = this;
 
-//    //load sysEx firmware file from app package
-//    pathSysex = QCoreApplication::applicationDirPath();
-//    pathSysex.remove(pathSysex.length() - 5, pathSysex.length());
-//    pathSysex.append("Resources/Quneo.syx");
-//    //qDebug() << QString("path: %1").arg(pathSysex);
-//    //sysExFirmware = new QFile(pathSysex);
-//    sysExFirmware = new QFile(":Quneo/sysex/resources/sysex/Quneo.syx");
-//    if(sysExFirmware->open(QIODevice::ReadOnly)){
-//        //qDebug("sysex open");
-//    } else {
-//        //qDebug("couldn't find sysex");
-//    }
+    //load sysEx firmware file from app package
+    pathSysex = QCoreApplication::applicationDirPath();
+    pathSysex.remove(pathSysex.length() - 5, pathSysex.length());
+    pathSysex.append("Resources/Quneo.syx");
+    //qDebug() << QString("path: %1").arg(pathSysex);
+    //sysExFirmware = new QFile(pathSysex);
+    sysExFirmware = new QFile(":Quneo/sysex/resources/sysex/Quneo.syx");
+    if(sysExFirmware->open(QIODevice::ReadOnly)){
+        //qDebug("sysex open");
+    } else {
+        //qDebug("couldn't find sysex");
+    }
 
-//    //read all data from file, and store in a QByteArray
-//    sysExFirmwareBytes = sysExFirmware->readAll();
-//    //qDebug() <<"sysex size:" << sysExFirmwareBytes.size();
+    //read all data from file, and store in a QByteArray
+    sysExFirmwareBytes = sysExFirmware->readAll();
+    //qDebug() <<"sysex size:" << sysExFirmwareBytes.size();
 
-//    //create new char array of the above byte array size
-//    sysExFirmwareData = new char[sysExFirmwareBytes.size()];
+    //create new char array of the above byte array size
+    sysExFirmwareData = new char[sysExFirmwareBytes.size()];
 
-//    //assigne bytes to array, necessary for sending midi according to mac midi services
-//    sysExFirmwareData = sysExFirmwareBytes.data();
+    //assigne bytes to array, necessary for sending midi according to mac midi services
+    sysExFirmwareData = sysExFirmwareBytes.data();
 
-//    //******* Load Preset SysEx Files ********//
-//    for(int i = 0; i<16; i++){
-//        loadPreset[i] = new QFile(QString(":Quneo/sysex/resources/sysex/loadPresets/loadPreset%1.syx").arg(i));
-//        if(loadPreset[i]->open(QIODevice::ReadOnly)){
-//            //qDebug() << "load preset open" << i;
-//        } else {
-//            //qDebug() << "could not open load preset" << i;
-//        }
+    //******* Load Preset SysEx Files ********//
+    for(int i = 0; i<16; i++){
+        loadPreset[i] = new QFile(QString(":Quneo/sysex/resources/sysex/loadPresets/loadPreset%1.syx").arg(i));
+        if(loadPreset[i]->open(QIODevice::ReadOnly)){
+            //qDebug() << "load preset open" << i;
+        } else {
+            //qDebug() << "could not open load preset" << i;
+        }
 
-//        loadPresetBytes[i] = loadPreset[i]->readAll();
-//        loadPresetSize[i] = loadPresetBytes[i].size();
-//        loadPresetData[i] = new char[loadPresetSize[i]];
-//        loadPresetData[i] = loadPresetBytes[i].data();
-//    }
+        loadPresetBytes[i] = loadPreset[i]->readAll();
+        loadPresetSize[i] = loadPresetBytes[i].size();
+        loadPresetData[i] = new char[loadPresetSize[i]];
+        loadPresetData[i] = loadPresetBytes[i].data();
+    }
 
-//    //get sources and dests, and store in vector
-//    //getSourcesDests();
+    //get sources and dests, and store in vector
+    getSourcesDests();
 
 
 }
@@ -123,102 +131,61 @@ void MidiDeviceAccess::getSourcesDests()
     boardVersion = QString("Not Connected");
     boardVersionBoot = QString("Not Connected");
 
-//    sourceCount = 0;
-//    destCount = 0;
+    sourceCount = 0;
+    destCount = 0;
 
-//    //clear source/dest vectors
-//    quNeoSources.clear();
-//    quNeoDests.clear();
+    //clear source/dest vectors
+    quNeoSources.clear();
+    quNeoDests.clear();
 
-//    //Sources
-//    //get number of sources
-//    sourceCount = MIDIGetNumberOfSources();
+    //Sources
+      RtMidiOut midiIn(RtMidi::LINUX_ALSA);
+      sourceCount = midiIn.getPortCount();
 
-//    //iterate through sources
-//    for (ItemCount i = 0 ; i < sourceCount ; ++i)
-//    {
-
-//        //get endpoint ref for currentsource
-//        MIDIEndpointRef source = MIDIGetSource(i);
-
-//        //if endpoint ref is not null, see if name contains QUNEO
-//        if (source != NULL)
-//        {
-//            if(getDisplayName(source).contains("QUNEO"))
-//            {
-
-//                //if source contains QUNEO, add to sources vector
-//                quNeoSources.push_back(source);
-//            }
-//        }
-//    }
+    for (int i = 0 ; i < sourceCount ; ++i)
+    {
+        string portName = midiIn.getPortName(i);
+        std::transform(portName.begin(), portName.end(), portName.begin(), ::toupper);
+        if(string::npos != portName.find("QUNEO")) {
+            quNeoSources.push_back(pair<int, string>(i, portName));
+        }
+    }
 
 //    //Destinations (same procedure as above)
-//    destCount = MIDIGetNumberOfDestinations();
+      RtMidiOut midiOut(RtMidi::LINUX_ALSA);
+      destCount = midiOut.getPortCount();
 
-//    for (ItemCount i = 0 ; i < destCount ; ++i)
-//    {
-
-//        // Grab a reference to a destination endpoint
-//        MIDIEndpointRef dest = MIDIGetDestination(i);
-
-//        if (dest != NULL)
-//        {
-//            if(getDisplayName(dest).contains("QUNEO"))
-//            {
-//                quNeoDests.push_back(dest);
-//            }
-//        }
-//    }
+    for (int i = 0 ; i < destCount ; ++i)
+    {
+        string portName = midiOut.getPortName(i);
+        std::transform(portName.begin(), portName.end(), portName.begin(), ::toupper);
+        if(string::npos != portName.find("QUNEO")) {
+            quNeoDests.push_back(pair<int, string>(i, portName));
+        }
+    }
 
 //    //clear and repopulate device menu
-//    deviceMenu->clear();
+    deviceMenu->clear();
 
-//    //if there are any dests add them to the menu, here's where we might want to limit number
-//    if(quNeoDests.size() == 0)
-//    {
-
-//        //if(msgBox.isVisible()){
-//        //msgBox.close();
-//        //}
+    //if there are any dests add them to the menu, here's where we might want to limit number
+    if(quNeoDests.size() == 0)
+    {
 
 //        //if not dests, put none in the menu
-//        deviceMenu->insertItem(0, QString("None"));
+        deviceMenu->insertItem(0, QString("None"));
 
-//        emit sigQuNeoConnected(false);
+        emit sigQuNeoConnected(false);
 
-//    }
-//    else if(quNeoDests.size() > 1)
-//    {
-
-//        //MIDIRestart();
-//        //getSourcesDests();
-
-
-//        msgBox.setText("You have too many QuNeos plugged in.");
-//        msgBox.setInformativeText("Please edit 1 QuNeo at a time.");
-//        msgBox.setDefaultButton(QMessageBox::Ok);
-//        msgBox.setIcon(QMessageBox::Warning);
-//        msgBox.setWindowModality(Qt::NonModal);
-//        int ret = msgBox.exec();
-
-//        if(ret == QMessageBox::Ok)
-//        {
-//            qDebug() << "ok hit";
-
-//            QTimer::singleShot(2000, this, SLOT(getSourcesDests()));
-//        }
-
-//    }
-//    else
-//    {
-//        //enumerate quneos in menu
-//        for(int i= 0; i < quNeoDests.size(); i++)
-//        {
-//            deviceMenu->insertItem(i, QString("QuNeo %1").arg(i+1));
-//            emit sigQuNeoConnected(true);
-//        }
-//    }
+    }
+    else
+    {
+        //enumerate quneos in menu
+        for(std::vector<pair<int, string> >::const_iterator iterator = quNeoDests.begin(); iterator != quNeoDests.end(); ++iterator)
+        {
+            deviceMenu->insertItem(iterator->first, QString::fromStdString(iterator->second) );
+            emit sigQuNeoConnected(true);
+        }
+    }
 //    // emit sigSetVersions(editorVersion, boardVersion);
 
 }
