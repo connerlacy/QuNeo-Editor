@@ -28,7 +28,7 @@ public:
     QFile *sysExFirmware; //sysex firmware file
     QByteArray sysExFirmwareBytes; //sysex firmware as byte array
     int bytesLeft;
-    char *sysExFirmwareData; //char array address for sysex firmware
+    vector<unsigned char> sysExFirmwareData; //char array address for sysex firmware
     QList<int> sysExMsg;    //used to process sysEx messages from start to finish in slotProcessSysExRx(int);
 
     //---------Bootloader and Firmware Versioning vars--------//
@@ -47,24 +47,19 @@ public:
     QComboBox *presetMenu; //used for gathering current preset for updating
     int currentPreset; //preset to update
 
-    //--------Mac Midi Services Vars--------//
-//    MIDIClientRef appyClientRef; //reference to our app
-//    MIDIPortRef appyInPortRef;  //reference to our app's input port
-//    MIDIPortRef appyOutPortRef; //reference to our app's output port
+    //--------RtMidi Midi Services Vars--------//
+    RtMidiIn *midiIn;  //reference to our app's input port
+    RtMidiOut *midiOut; //reference to our app's output port
     vector<pair<int, string> > quNeoDests; //vector of endpoint destination references (our devices' input ports)
     vector<pair<int, string> > quNeoSources; //vector of endpoint source references (our devices' output ports)
-//    MIDIEndpointRef selectedDevice; //our currently selected device reference
-//    MIDIPacketList midiPacketList; //our list of midi packets for input
-//    MIDIPacket* midiPacket;        //pointer to a single midi packet, used as the "current packet" when iterating throuhg packet list
+    int selectedDevice;
 
     int sourceCount;
     int destCount;
 
 //    //-----Internal helper functions, not necessary for SIGS/SLOTS---------//
 
-//    void connectDevice(); //connects a single device
-//    QString getDisplayName(MIDIObjectRef object); //gets "name" of QuNeo device
-//    QString cFStringRefToQString(CFStringRef); //converts CFString to QString for easier use w/in Qt
+    void connectDevice(); //connects a single device
 
 
     //------- Load Preset Files ------///
@@ -81,6 +76,7 @@ public:
     QString editorVersionBoot;
     QString boardVersionBoot;
 
+    void processSysex(vector<unsigned char> *message);
 
 signals:
     void clearDeviceMenu(); //clears the device menu
@@ -98,7 +94,6 @@ public slots:
     void slotUpdateSinglePreset(); //updates current preset
     void slotUpdateFirmware(); //puts board into bootloader mode, waits 5 seconds, then updates fw
     void slotCheckFirmwareVersion(); //checks fw and bootloader versions
-    void slotProcessSysExRx(int); //processes sysEx messages
     void slotDownloadFw(); //called 5s after board enters bootloader
     void slotLoadPreset(); //activates preset on the board after an update
     void slotSwapLeds(); //sends sysex message to swap leds

@@ -2,17 +2,17 @@
 #include <QDebug>
 
 //sysEx array for querying the board's ID
-char checkFwSysExData[] = {
+unsigned char checkFwSysExData[] = {
     0xF0,0x7E,0x7F,0x06,0x01,0xF7
 };
 
-char swapLedsSysExData[] = {0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x02, 0x44, 0x5D, 0x00, 0x10, 0xF7};
+unsigned char swapLedsSysExData[] = {0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x02, 0x44, 0x5D, 0x00, 0x10, 0xF7};
 
-char toggleProgramChangeInSysExData[] = {0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x06, 0x04, 0x59, 0x00, 0x30, 0xF7};
-char toggleProgramChangeOutSysExData[] ={0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x05, 0x34, 0x3A, 0x00, 0x30, 0xF7};
+unsigned char toggleProgramChangeInSysExData[] = {0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x06, 0x04, 0x59, 0x00, 0x30, 0xF7};
+unsigned char toggleProgramChangeOutSysExData[] ={0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x05, 0x34, 0x3A, 0x00, 0x30, 0xF7};
 
 //sysEx array for entering bootloader mode
-char enterBootloaderData[] = {
+unsigned char enterBootloaderData[] = {
     0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x11, 0x00, 0x5A, 0x62, 0x00, 0x30,
     0x10, 0xF7};
 
@@ -25,21 +25,25 @@ bool firmwareSent = true;
 //determines whether device has reconnected or not
 bool deviceReconnected = true;
 
+vector <RtMidiIn> inputs;
+
+// until we use c++11
+template <typename T, size_t N> T* begin(T(&arr)[N]) { return &arr[0]; }
+template <typename T, size_t N> T* end(T(&arr)[N]) { return &arr[0]+N; }
+
+//----Helper/convinience functons ----------------//
+void sendSysex(RtMidiOut *midiOut, vector<unsigned char> message);
+std::vector<pair<int, string > > enumeratePorts(RtMidiOut& midiOut);
+
 //----Callback Declarations and Class Pointer----//
 MidiDeviceAccess* callbackPointer; //var for non class callbacks to access class
-//void getMIDINotificationVirtual(const MIDINotification *message, void *refCon); //notification of when MIDI state changes (new controllers)
-//void sysExComplete(MIDISysexSendRequest*); //called when sysex event has been completely sent
-//void incomingMidi(const MIDIPacketList *pktlist, void *readProcRefCon, void *srcConnRefCon); //called upon incoming midi with connected port
-//bool sysEx = false; //determines whether or not incomding midi is of sysEx type
+void rtMidiCallback( double deltatime, std::vector< unsigned char > *message, void *userData );
 
 
 MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) :
     QObject(parent)
 {
     //these array vals should be set to the most recent fw and bootloader version
-    // versionArray[0] = 2; //bootloader LSB
-    //versionArray[1] = 1; //booloader MSB
-
     versionArray[0] = 3; //bootloader LSB
     versionArray[1] = 1; //booloader MSB
     versionArray[2] = 19; //fw LSB
@@ -63,7 +67,7 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     deviceMenu = mainWindow->findChild<QComboBox *>("deviceMenu");
     connect(deviceMenu, SIGNAL(currentIndexChanged(QString)), this, SLOT(slotSelectDevice(QString)));
     deviceMenu->setEnabled(false);
-//    selectedDevice = NULL;
+    selectedDevice = -1;
 
     //initialize to preset 0, just like everything else, connect preset menu to gather preset num
     currentPreset = 0;
@@ -99,10 +103,10 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     //qDebug() <<"sysex size:" << sysExFirmwareBytes.size();
 
     //create new char array of the above byte array size
-    sysExFirmwareData = new char[sysExFirmwareBytes.size()];
+//    sysExFirmwareData = new char[sysExFirmwareBytes.size()];
 
-    //assigne bytes to array, necessary for sending midi according to mac midi services
-    sysExFirmwareData = sysExFirmwareBytes.data();
+    //assign bytes to array, necessary for sending midi according to mac midi services
+//    sysExFirmwareData.insert(sysExFirmwareData.data(), )
 
     //******* Load Preset SysEx Files ********//
     for(int i = 0; i<16; i++){
@@ -119,6 +123,10 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
         loadPresetData[i] = loadPresetBytes[i].data();
     }
 
+//    midiIn = new RtMidiIn(RtMidi::UNIX_JACK, "KMI-EDITOR");
+//    midiOut = new RtMidiOut(RtMidi::UNIX_JACK, "KMI-EDITOR");
+    midiIn = new RtMidiIn(RtMidi::LINUX_ALSA, "KMIEDITOR");
+    midiOut = new RtMidiOut(RtMidi::LINUX_ALSA, "KMIEDITOR");
     //get sources and dests, and store in vector
     getSourcesDests();
 
@@ -139,12 +147,11 @@ void MidiDeviceAccess::getSourcesDests()
     quNeoDests.clear();
 
     //Sources
-      RtMidiOut midiIn(RtMidi::LINUX_ALSA);
-      sourceCount = midiIn.getPortCount();
+      sourceCount = midiIn->getPortCount();
 
     for (int i = 0 ; i < sourceCount ; ++i)
     {
-        string portName = midiIn.getPortName(i);
+        string portName = midiIn->getPortName(i);
         std::transform(portName.begin(), portName.end(), portName.begin(), ::toupper);
         if(string::npos != portName.find("QUNEO")) {
             quNeoSources.push_back(pair<int, string>(i, portName));
@@ -152,12 +159,11 @@ void MidiDeviceAccess::getSourcesDests()
     }
 
 //    //Destinations (same procedure as above)
-      RtMidiOut midiOut(RtMidi::LINUX_ALSA);
-      destCount = midiOut.getPortCount();
+      destCount = midiOut->getPortCount();
 
     for (int i = 0 ; i < destCount ; ++i)
     {
-        string portName = midiOut.getPortName(i);
+        string portName = midiOut->getPortName(i);
         std::transform(portName.begin(), portName.end(), portName.begin(), ::toupper);
         if(string::npos != portName.find("QUNEO")) {
             quNeoDests.push_back(pair<int, string>(i, portName));
@@ -171,10 +177,32 @@ void MidiDeviceAccess::getSourcesDests()
     if(quNeoDests.size() == 0)
     {
 
-//        //if not dests, put none in the menu
+        //if not dests, put none in the menu
         deviceMenu->insertItem(0, QString("None"));
 
         emit sigQuNeoConnected(false);
+
+    }
+    else if(quNeoDests.size() > 1)
+    {
+
+        //MIDIRestart();
+        //getSourcesDests();
+
+
+        msgBox.setText("You have too many QuNeos plugged in.");
+        msgBox.setInformativeText("Please edit 1 QuNeo at a time.");
+        msgBox.setDefaultButton(QMessageBox::Ok);
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setWindowModality(Qt::NonModal);
+        int ret = msgBox.exec();
+
+        if(ret == QMessageBox::Ok)
+        {
+            qDebug() << "ok hit";
+
+            QTimer::singleShot(2000, this, SLOT(getSourcesDests()));
+        }
 
     }
     else
@@ -182,135 +210,90 @@ void MidiDeviceAccess::getSourcesDests()
         //enumerate quneos in menu
         for(std::vector<pair<int, string> >::const_iterator iterator = quNeoDests.begin(); iterator != quNeoDests.end(); ++iterator)
         {
-            deviceMenu->insertItem(iterator->first, QString::fromStdString(iterator->second) );
+            deviceMenu->insertItem((*iterator).first, QString::fromStdString((*iterator).second) );
             emit sigQuNeoConnected(true);
         }
     }
-//    // emit sigSetVersions(editorVersion, boardVersion);
+    // emit sigSetVersions(editorVersion, boardVersion);
 
 }
 
-//QString MidiDeviceAccess::getDisplayName(MIDIObjectRef object) {
 
-//    // Returns the display name of a given MIDIObjectRef as an NSString
-//    CFStringRef name = nil; //place holder for name
+void MidiDeviceAccess::connectDevice(){ //makes a connection between a device and our app's i/o ports
 
-//    if(noErr != MIDIObjectGetStringProperty(object, kMIDIPropertyDisplayName, &name)){//get the name using midi services function
-//        return nil;
-//    }
+    qDebug() << "_____connectDevice() called_____";
 
-//    return QString(cFStringRefToQString(name)); //return the name
-//}
+    // disconnect any open connections
+    midiOut->closePort();
+    midiIn->cancelCallback();
+    midiIn->closePort();
 
-//QString MidiDeviceAccess::cFStringRefToQString(CFStringRef ref){
+    if(selectedDevice>-1)
+    {
+        midiOut->openPort(selectedDevice, "kmiEditor");
+        qDebug() << "opened output to " << QString::fromStdString(midiOut->getPortName(selectedDevice));
+        //if source vector contains any QuNeo sources, then iterate through them and connect
+        for(vector<pair<int,string> >::const_iterator src_device = quNeoSources.begin(); src_device != quNeoSources.end(); ++src_device)
+        {
+            //connect source to our client's input port
+            //FIXME : will end on last port - this is only ok currently as we only allow one QUNEO 
+            //to be attached.
+            qDebug() << "set listen on " <<  QString::fromStdString((*src_device).second);
+            midiIn->openPort((*src_device).first, "kmiEditor");
+            midiIn->setCallback(&rtMidiCallback, callbackPointer);
+            midiIn->ignoreTypes(false, true, true);
+            
+        }
 
-//    //this function just translates a CFStringRef into a QString
-//    CFRange range;
-//    range.location = 0;
-//    range.length = CFStringGetLength(ref);
-//    QString result(range.length, QChar(0));
-
-//    UniChar *chars = new UniChar[range.length];
-//    CFStringGetCharacters(ref, range, chars);
-//    //[nsstr getCharacters:chars range:range];
-//    result = QString::fromUtf16(chars, range.length);
-//    delete[] chars;
-//    return result;
-
-//}
-
-//void MidiDeviceAccess::connectDevice(){ //makes a connection between a device and our app's i/o ports
-
-//    qDebug() << "_____connectDevice() called_____";
-
-//    //dispose of client (and ports/connections) if it exists
-//    //if(appyClientRef){
-//    MIDIClientDispose(appyClientRef);
-//    //}
-
-//    //create client (CoreMIDI's reference to this app)
-//    MIDIClientCreate(CFSTR("appy"), getMIDINotificationVirtual, this, &appyClientRef);
-
-//    //create input and output ports for our client
-//    MIDIInputPortCreate(appyClientRef, CFSTR("appyInPort"), incomingMidi, this, &appyInPortRef);
-//    MIDIOutputPortCreate(appyClientRef, CFSTR("appyOutPort"), &appyOutPortRef);
-
-//    //if source vector contains any QuNeo sources, then iterate through them and connect
-//    if(selectedDevice)
-//    {
-//        for(int i=0; i<quNeoSources.size(); i++)
-//        {
-//            //connect source to our client's input port
-//            MIDIPortConnectSource(appyInPortRef, quNeoSources.at(i), &quNeoSources.at(i));
-//        }
-
-//        //if not in bootloader mode, send sysex check fw message upon device connection/selection
-//        if(!inBootloader){
-//            slotCheckFirmwareVersion();
-//        }
-//    }
-//}
+        //if not in bootloader mode, send sysex check fw message upon device connection/selection
+        if(!inBootloader){
+            slotCheckFirmwareVersion();
+        }
+    }
+}
 
 void MidiDeviceAccess::slotSelectDevice(QString index){
 
-//    qDebug() << "_____ slotSelectDevice() called_____" << index;
+    qDebug() << "_____ slotSelectDevice() called_____" << index;
 
-//    //if selected device contains QuNeo, then iterate through dests and assign index to selected device
-//    if(index.contains(QString("QuNeo"))){
-//        int i = index.remove(0,6).toInt() - 1;
-//        selectedDevice = quNeoDests.at(i);
-
-//    } else {
-//        selectedDevice = NULL;
-//    }
-//    //after device selection connect device (regardless of whether selected device is NULL, this is taken care of in connectDevice())
-//    connectDevice();
+    selectedDevice = -1;
+    //if selected device contains QuNeo, then iterate through dests and assign index to selected device
+    if(index.contains(QString("QuNeo"), Qt::CaseInsensitive)){
+        for(vector<pair<int,string> >::const_iterator device = quNeoDests.begin(); device != quNeoDests.end(); ++device) {
+            if( 0==index.toStdString().compare((*device).second) ){
+                selectedDevice = (*device).first;
+            }
+        }
+    } 
+    //after device selection connect device (regardless of whether selected device is NULL, this is taken care of in connectDevice())
+    connectDevice();
 
 }
 
-void MidiDeviceAccess::slotUpdateAllPresets(){ //used for updating all presets at once
-
+void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets at once
 
 //    if(deviceMenu->currentText() == "QuNeo 1"){
-//        for(int i= 0; i< 16; i++){
+        for(int i= 0; i< 16; i++){
 
-//            //encode current preset data
-//            sysExFormat->slotEncodePreset(i);
+            //encode current preset data
+            sysExFormat->slotEncodePreset(i);
 
-//            //create char array of the most recently encoded preset using sysExFormat
-//            char *presetSysExData = new char(sysExFormat->presetSysExByteArray.size());
+            //create char array of the most recently encoded preset using sysExFormat
+            char *presetSysExData = new char(sysExFormat->presetSysExByteArray.size());
 
-//            //assign sysExFormat data to char array
-//            presetSysExData = sysExFormat->presetSysExByteArray.data();
+            //assign sysExFormat data to char array
+            presetSysExData = sysExFormat->presetSysExByteArray.data();
 
-//            //if there is a selected device, send down preset data via sysex protocol
-//            if(selectedDevice){
+            //if there is a selected device, send down preset data via sysex protocol
+            if(selectedDevice){
+                vector<unsigned char> message(presetSysExData, presetSysExData + sysExFormat->presetSysExByteArray.size());
+                sendSysex(midiOut, message);
+                qDebug("check fw sent");
+            }
+        }
 
-//                //create new sysex event/request for preset
-//                updateAllPresetSysExReq = new MIDISysexSendRequest;
-
-//                //set event/request params
-//                updateAllPresetSysExReq->destination = selectedDevice;
-//                updateAllPresetSysExReq->data = (const Byte *)presetSysExData;
-//                updateAllPresetSysExReq->bytesToSend = sysExFormat->presetSysExByteArray.size();
-//                updateAllPresetSysExReq->complete = false;
-//                updateAllPresetSysExReq->completionProc = &sysExComplete;
-//                updateAllPresetSysExReq->completionRefCon = presetSysExData;
-
-//                //send the syesex data
-//                MIDISendSysex(updateAllPresetSysExReq);
-
-//                while(updateAllPresetSysExReq->bytesToSend > 0){
-//                    qDebug() << "bytes to send update all presets" << updateAllPresetSysExReq->bytesToSend;
-//                }
-
-//                //qDebug() << "done with preset" << i;
-//                emit sigUpdateAllPresetsCount(i);
-//            }
-//        }
-
-//        slotLoadPreset();
-//        emit sigUpdateAllPresetsCount(16);
+        slotLoadPreset();
+        emit sigUpdateAllPresetsCount(16);
 //    }
 
 }
@@ -319,88 +302,42 @@ void MidiDeviceAccess::slotUpdateSinglePreset(){
 
 //    if(deviceMenu->currentText() == "QuNeo 1"){
 
-//        //encode current preset
-//        sysExFormat->slotEncodePreset(currentPreset);
+        //encode current preset
+        sysExFormat->slotEncodePreset(currentPreset);
 
-//        //create new char array using most recently encoded preset
-//        char *presetSysExData = new char(sysExFormat->presetSysExByteArray.size());
+        //create new char array using most recently encoded preset
+        char *presetSysExData = new char(sysExFormat->presetSysExByteArray.size());
 
-//        //assign encoded data into char array
-//        presetSysExData = sysExFormat->presetSysExByteArray.data();
+        //assign encoded data into char array
+        presetSysExData = sysExFormat->presetSysExByteArray.data();
 
-//        //if there is a selected device
-//        if(selectedDevice){
+        //if there is a selected device
+        if(selectedDevice){
+                vector<unsigned char> message(presetSysExData, presetSysExData + sysExFormat->presetSysExByteArray.size());
+                sendSysex(midiOut, message);
+                qDebug("Preset Sysex Sent - Current Preset");
 
-//            //create new sysex event/request
-//            updateSinglePresetSysExReq = new MIDISysexSendRequest;
-
-//            //set event/request params
-//            updateSinglePresetSysExReq->destination = selectedDevice;
-//            updateSinglePresetSysExReq->data = (const Byte *)presetSysExData;
-//            updateSinglePresetSysExReq->bytesToSend = sysExFormat->presetSysExByteArray.size();
-//            updateSinglePresetSysExReq->complete = false;
-//            updateSinglePresetSysExReq->completionProc = &sysExComplete;
-//            updateSinglePresetSysExReq->completionRefCon = presetSysExData;
-
-//            //send the syesex data
-//            MIDISendSysex(updateSinglePresetSysExReq);
-//        }
-
-//        //chill while the sysex gets down...
-
-//        int bytes = 0;
-
-//        while(updateSinglePresetSysExReq->bytesToSend > 0){
-
-//            if(bytes != updateSinglePresetSysExReq->bytesToSend)
-//            {
-//                bytes = updateSinglePresetSysExReq->bytesToSend;
-//                qDebug() << "bytes left to send single preset" << bytes;
-//            }
-//        }
-
-//        //load the currently selected preset
-//        slotLoadPreset();
+        }
+        //load the currently selected preset
+        slotLoadPreset();
 //    }
 
 }
 
-void MidiDeviceAccess::slotLoadPreset(){
+void MidiDeviceAccess::slotLoadPreset() {
 
 
-//    char* loadPresetSysExData = new char[loadPresetSize[currentPreset]];
-//    loadPresetSysExData = loadPresetData[currentPreset];
+    char* loadPresetSysExData = new char[loadPresetSize[currentPreset]];
+    loadPresetSysExData = loadPresetData[currentPreset];
 
-//    //if there is a selected device
-//    if(selectedDevice){
+    //if there is a selected device
+    if (selectedDevice) {
 
-//        //create new sysex event/request
-//        loadPresetSysExReq = new MIDISysexSendRequest;
+        vector<unsigned char> message(loadPresetSysExData, loadPresetSysExData + loadPresetSize[currentPreset]);
+        sendSysex(midiOut, message);
+        qDebug("Preset Sysex Sent - Current Preset");
 
-//        //set event/request params
-//        loadPresetSysExReq->destination = selectedDevice;
-//        loadPresetSysExReq->data = (const Byte *)loadPresetSysExData;
-//        loadPresetSysExReq->bytesToSend = loadPresetSize[currentPreset];
-//        loadPresetSysExReq->complete = false;
-//        loadPresetSysExReq->completionProc = &sysExComplete;
-//        loadPresetSysExReq->completionRefCon = loadPresetSysExData;
-
-//        //send the syesex data
-//        MIDISendSysex(loadPresetSysExReq);
-//    }
-
-//    int bytes = 0;
-
-//    while(loadPresetSysExReq->bytesToSend > 0){
-
-//        if(bytes != loadPresetSysExReq->bytesToSend)
-//        {
-//            bytes = loadPresetSysExReq->bytesToSend;
-//            qDebug() << "load pesets byes to send" << bytes;
-//        }
-//    }
-
-
+    }
 
 }
 
@@ -465,160 +402,119 @@ void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmwar
 
 void MidiDeviceAccess::slotCheckFirmwareVersion(){//this function checks versions with sysEx
 
-//    checkFwSysEx = new MIDISysexSendRequest;
-
-//    //currentSysExMessage = checkFwSysEx;
-
-//    //set event/request params
-//    checkFwSysEx->destination = selectedDevice;
-//    checkFwSysEx->data = (const Byte *)checkFwSysExData;
-//    checkFwSysEx->bytesToSend = 6;
-//    checkFwSysEx->complete = false;
-//    checkFwSysEx->completionProc = &sysExComplete;
-//    checkFwSysEx->completionRefCon = checkFwSysExData;
-
-//    //send the syesex data
-//    MIDISendSysex(checkFwSysEx);
+    vector<unsigned char> message(begin(checkFwSysExData), end(checkFwSysExData));
+    sendSysex(midiOut, message);
+    qDebug("check fw sent");
 
 }
 
-void MidiDeviceAccess::slotSwapLeds(){//this function checks versions with sysEx
+void MidiDeviceAccess::slotSwapLeds(){
 
-//    swapLEDsSysExReq = new MIDISysexSendRequest;
-
-//    //currentSysExMessage = checkFwSysEx;
-
-//    //set event/request params
-//    swapLEDsSysExReq->destination = selectedDevice;
-//    swapLEDsSysExReq->data = (const Byte *)swapLedsSysExData;
-//    swapLEDsSysExReq->bytesToSend = 17;
-//    swapLEDsSysExReq->complete = false;
-//    swapLEDsSysExReq->completionProc = &sysExComplete;
-//    swapLEDsSysExReq->completionRefCon = swapLedsSysExData;
-
-//    //send the syesex data
-//    MIDISendSysex(swapLEDsSysExReq);
-
+    vector<unsigned char> message(begin(swapLedsSysExData), end(swapLedsSysExData));
+    sendSysex(midiOut, message);
 }
-
 
 void MidiDeviceAccess::slotSetCurrentPreset(QString selected){
-//    if(selected.contains("Preset ")){ //remove prepended preset
-//        if(selected.contains(" *")){    //remove asterisk if recalling unsaved/modified preset
-//            selected.remove(" *");
-//        }
-//        currentPreset = selected.remove(0,7).toInt() -1; //reduce string to number
-//        //qDebug() << "Current Preset" << currentPreset;
-//    }
-}
-
-void MidiDeviceAccess::slotProcessSysExRx(int val){
-
-//    //if not in bootloader...
-//    if(!inBootloader){
-//        //qDebug() << "sysex data" << val;
-//        //qDebug("sysEx %x", val);
-
-//        if(val == 247){ //if val is terminating sysex, append list with it
-//            sysExMsg.append(247);
-
-//            //if device ID, set fw and bootloader vars
-//            if(sysExMsg.size() == 17 && sysExMsg.at(3) == 6 && sysExMsg.at(4) == 2){
-
-
-//                qDebug() << "boot LSB" << sysExMsg.at(12);
-//                qDebug() << "boot MSB" << sysExMsg.at(13);
-//                qDebug() << "fw LSB" << sysExMsg.at(14);
-//                qDebug() << "fw MSB" << sysExMsg.at(15);
-
-
-//                //set version vars from sysex message
-//                bootloaderVersionLSB = sysExMsg.at(12);
-//                bootloaderVersionMSB = sysExMsg.at(13);
-//                fwVersionLSB = sysExMsg.at(14);
-//                fwVersionMSB = sysExMsg.at(15);
-
-//                boardVersion = QString("%1.%2.%3").arg(fwVersionMSB/16).arg(fwVersionMSB%16).arg(fwVersionLSB);
-//                boardVersionBoot = QString("%1.%2").arg(bootloaderVersionMSB).arg(bootloaderVersionLSB);
-
-//                //qDebug() << "fw:" << fwVersionMSB << fwVersionLSB;
-//                //qDebug() << "bootloader:" << bootloaderVersionMSB << bootloaderVersionLSB;
-
-//                //check version vars against version array
-//                if(//versionArray[0] != bootloaderVersionLSB ||
-//                        //versionArray[1] != bootloaderVersionMSB ||
-//                        versionArray[2] != fwVersionLSB ||
-//                        versionArray[3] != fwVersionMSB%16 ||
-//                        versionArray[4] != fwVersionMSB/16){
-//                    emit sigFirmwareCurrent(false);
-//                    //qDebug() << "version good" << false;
-//                } else {
-//                    //qDebug() << "version good" << true;
-//                    emit sigFirmwareCurrent(true);
-//                }
-//            }
-//            sysExMsg.clear();
-//        } else {
-//            sysExMsg.append(val);
-//        }
-//    }
+    if(selected.contains("Preset ")){ //remove prepended preset
+        if(selected.contains(" *")){    //remove asterisk if recalling unsaved/modified preset
+            selected.remove(" *");
+        }
+        currentPreset = selected.remove(0,7).toInt() -1; //reduce string to number
+        //qDebug() << "Current Preset" << currentPreset;
+    }
 }
 
 void MidiDeviceAccess::slotSendToggleProgramChangeOutput(){
-
-//    toggleProgramChangeOutSysExReq = new MIDISysexSendRequest;
-
-//    //currentSysExMessage = checkFwSysEx;
-
-//    //set event/request params
-//    toggleProgramChangeOutSysExReq->destination = selectedDevice;
-//    toggleProgramChangeOutSysExReq->data = (const Byte *)toggleProgramChangeOutSysExData;
-//    toggleProgramChangeOutSysExReq->bytesToSend = 17;
-//    toggleProgramChangeOutSysExReq->complete = false;
-//    toggleProgramChangeOutSysExReq->completionProc = &sysExComplete;
-//    toggleProgramChangeOutSysExReq->completionRefCon = toggleProgramChangeOutSysExData;
-
-//    //send the syesex data
-//    MIDISendSysex(toggleProgramChangeOutSysExReq);
-
-
+    vector<unsigned char> message(begin(toggleProgramChangeOutSysExData), end(toggleProgramChangeOutSysExData));
+    sendSysex(midiOut, message);
 }
 
 void MidiDeviceAccess::slotSendToggleProgramChangeInput(){
-
-//    toggleProgramChangeInSysExReq = new MIDISysexSendRequest;
-
-//    //currentSysExMessage = checkFwSysEx;
-
-//    //set event/request params
-//    toggleProgramChangeInSysExReq->destination = selectedDevice;
-//    toggleProgramChangeInSysExReq->data = (const Byte *)toggleProgramChangeInSysExData;
-//    toggleProgramChangeInSysExReq->bytesToSend = 17;
-//    toggleProgramChangeInSysExReq->complete = false;
-//    toggleProgramChangeInSysExReq->completionProc = &sysExComplete;
-//    toggleProgramChangeInSysExReq->completionRefCon = toggleProgramChangeInSysExData;
-
-//    //send the syesex data
-//    MIDISendSysex(toggleProgramChangeInSysExReq);
+    vector<unsigned char> message(begin(toggleProgramChangeInSysExData), end(toggleProgramChangeInSysExData));
+    sendSysex(midiOut, message);
 }
 
+void MidiDeviceAccess::processSysex(std::vector< unsigned char > *message) {
+    if (message->size() == 17 && message->at(3) == 6 && message->at(4) == 2) {
+        // firmware inquery response
+
+        qDebug() << "boot LSB" << message->at(12);
+        qDebug() << "boot MSB" << message->at(13);
+        qDebug() << "fw LSB" << message->at(14);
+        qDebug() << "fw MSB" << message->at(15);
+
+
+        //set version vars from sysex message
+        bootloaderVersionLSB = message->at(12);
+        bootloaderVersionMSB = message->at(13);
+        fwVersionLSB = message->at(14);
+        fwVersionMSB = message->at(15);
+
+        boardVersion = QString("%1.%2.%3").arg(fwVersionMSB / 16).arg(fwVersionMSB % 16).arg(fwVersionLSB);
+        boardVersionBoot = QString("%1.%2").arg(bootloaderVersionMSB).arg(bootloaderVersionLSB);
+
+        //qDebug() << "fw:" << fwVersionMSB << fwVersionLSB;
+        //qDebug() << "bootloader:" << bootloaderVersionMSB << bootloaderVersionLSB;
+
+        //check version vars against version array
+        if (//versionArray[0] != bootloaderVersionLSB ||
+                //versionArray[1] != bootloaderVersionMSB ||
+                versionArray[2] != fwVersionLSB ||
+                versionArray[3] != fwVersionMSB % 16 ||
+                versionArray[4] != fwVersionMSB / 16) {
+            emit sigFirmwareCurrent(false);
+            //qDebug() << "version good" << false;
+        } else {
+            //qDebug() << "version good" << true;
+            emit sigFirmwareCurrent(true);
+        }
+    }
+
+}
 //-------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------------------------------------------------------//
 //--------------------------------------------Callback Definitions---------------------------------------//
 //-------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------------------------------------------------------//
 
+void rtMidiCallback( double deltatime, std::vector< unsigned char > *message, void *userData )
+{
+    if(240 == (int)message->at(0)) {
+        ((MidiDeviceAccess*)userData)->processSysex(message);
+    } else {
+        // currently we ignore anything that is not sysex
+        unsigned int nBytes = message->size();
+        for ( unsigned int i=0; i<nBytes; i++ )
+          qDebug() << "Byte " << i << " = " << (int)message->at(i) << ", ";
+        if ( nBytes > 0 )
+          qDebug() << "stamp = " << deltatime ;
+        
+    }
+}
 
-//these functions are used to communicate with apple services midi, and cannot be part of a class
-//see http://developer.apple.com/library/ios/#documentation/CoreMidi/Reference/MIDIServices_Reference/Reference/reference.html
-//void getMIDINotificationVirtual(const MIDINotification *message, void *refCon){
+    
+/*
+ * RtMidi Helper Functions
+ */
+void sendSysex(RtMidiOut *midiOut, vector<unsigned char> message) {
+    try {
+        midiOut->sendMessage(&message);
+    } catch (RtError &error) {
+//        cout << "An error occurred sending messge:" << endl;
+        //TODO: should probably send signal for UI to display error.
+        error.printMessage();
+    }
+    return;
+}
+std::vector<pair<int, string > > enumeratePorts(RtMidiOut *midiOut) {
+    std::vector < pair<int, string > > portSpecs;
+    int numPorts = midiOut->getPortCount();
+    for (int portId = 0; portId < numPorts; portId++) {
+        portSpecs.push_back(pair<int, string>(portId, midiOut->getPortName(portId)));
+    }
+    return portSpecs;
+}
 
-//    //get midi notifications-- if the setup changes...
-//    if(message->messageID == 1){
-//        qDebug("MIDI Setup Changed");
-//        callbackPointer->getSourcesDests();
-//    }
-//}
 
 //void sysExComplete(MIDISysexSendRequest* request)
 //{
@@ -641,47 +537,3 @@ void MidiDeviceAccess::slotSendToggleProgramChangeInput(){
 //    }
 //}
 
-//void incomingMidi(const MIDIPacketList *pktlist, void *readProcRefCon, void *srcConnRefCon){
-
-//    //iterate through midi packets and process according to type
-//    const MIDIPacket *packet = &pktlist->packet[0];
-
-//    //for number packets in packet list
-//    for(int i =0; i < pktlist->numPackets; i++){
-
-//        //for length of packet
-//        for(int j = 0; j < packet->length; j++){
-
-//            //if packet data is sysEx start...
-//            if(packet->data[j] == 240){
-
-//                //start to send vals for sysex processing
-//                callbackPointer->slotProcessSysExRx(packet->data[j]);
-
-//                //set sysEx message type to true to process rest of sysex
-//                sysEx = true;
-
-//                //if packet is terminating sysex...
-//            } else if(packet->data[j] == 247){
-
-//                //send terminating val to sysex processing
-//                callbackPointer->slotProcessSysExRx(packet->data[j]);
-
-//                //set sysEx message type to false to cease processing
-//                sysEx = false;
-
-//            } else {
-
-//                //if sysEx is true, send all input to slot processing
-//                if(sysEx){
-//                    callbackPointer->slotProcessSysExRx(packet->data[j]);
-//                } else if(packet->data[j] != 247){
-//                    //here's where non sysEx midi data gets read
-//                    //qDebug() << "midi data" << packet->data[j];
-//                }
-//            }
-//        }
-//        //advance packet in midi packet list
-//        packet = MIDIPacketNext(packet);
-//    }
-//}
