@@ -27,9 +27,7 @@ public:
     QString pathSysex; //path of sysex firmware file in build
     QFile *sysExFirmware; //sysex firmware file
     QByteArray sysExFirmwareBytes; //sysex firmware as byte array
-    int bytesLeft;
     vector<unsigned char> sysExFirmwareData; //char array address for sysex firmware
-    QList<int> sysExMsg;    //used to process sysEx messages from start to finish in slotProcessSysExRx(int);
 
     //---------Bootloader and Firmware Versioning vars--------//
     int fwVersionLSB; //stores LSB of FW version when query returns in slotProcessSysExRx(int);

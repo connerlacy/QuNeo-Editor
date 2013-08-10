@@ -1454,11 +1454,13 @@ void MidiInAlsa :: openPort( unsigned int portNumber, const std::string portName
     RtMidi::error( RtError::NO_DEVICES_FOUND, errorString_ );
   }
 
-  snd_seq_port_info_t *pinfo;
-  snd_seq_port_info_alloca( &pinfo );
+  snd_seq_port_info_t *src_pinfo;
+  snd_seq_port_info_alloca( &src_pinfo );
+  snd_seq_port_info_t *dest_pinfo;
+  snd_seq_port_info_alloca( &dest_pinfo );
   std::ostringstream ost;
   AlsaMidiData *data = static_cast<AlsaMidiData *> (apiData_);
-  if ( portInfo( data->seq, pinfo, SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ, (int) portNumber ) == 0 ) {
+  if ( portInfo( data->seq, src_pinfo, SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ, (int) portNumber ) == 0 ) {
     ost << "MidiInAlsa::openPort: the 'portNumber' argument (" << portNumber << ") is invalid.";
     errorString_ = ost.str();
     RtMidi::error( RtError::INVALID_PARAMETER, errorString_ );
@@ -1466,26 +1468,26 @@ void MidiInAlsa :: openPort( unsigned int portNumber, const std::string portName
 
 
   snd_seq_addr_t sender, receiver;
-  sender.client = snd_seq_port_info_get_client( pinfo );
-  sender.port = snd_seq_port_info_get_port( pinfo );
-  receiver.client = snd_seq_client_id( data->seq );
+  sender.client = snd_seq_port_info_get_client( src_pinfo );
+  sender.port = snd_seq_port_info_get_port( src_pinfo );
+  //receiver.client = snd_seq_client_id( data->seq );
   if ( data->vport < 0 ) {
-    snd_seq_port_info_set_client( pinfo, 0 );
-    snd_seq_port_info_set_port( pinfo, 0 );
-    snd_seq_port_info_set_capability( pinfo,
+    snd_seq_port_info_set_client( dest_pinfo, 0 );
+    snd_seq_port_info_set_port( dest_pinfo, 0 );
+    snd_seq_port_info_set_capability( dest_pinfo,
                                       SND_SEQ_PORT_CAP_WRITE |
                                       SND_SEQ_PORT_CAP_SUBS_WRITE );
-    snd_seq_port_info_set_type( pinfo,
+    snd_seq_port_info_set_type( dest_pinfo,
                                 SND_SEQ_PORT_TYPE_MIDI_GENERIC |
                                 SND_SEQ_PORT_TYPE_APPLICATION );
-    snd_seq_port_info_set_midi_channels(pinfo, 16);
+    snd_seq_port_info_set_midi_channels(dest_pinfo, 16);
 #ifndef AVOID_TIMESTAMPING
-    snd_seq_port_info_set_timestamping(pinfo, 1);
-    snd_seq_port_info_set_timestamp_real(pinfo, 1);    
-    snd_seq_port_info_set_timestamp_queue(pinfo, data->queue_id);
+    snd_seq_port_info_set_timestamping(dest_pinfo, 1);
+    snd_seq_port_info_set_timestamp_real(dest_pinfo, 1);    
+    snd_seq_port_info_set_timestamp_queue(dest_pinfo, data->queue_id);
 #endif
-    snd_seq_port_info_set_name(pinfo,  portName.c_str() );
-    data->vport = snd_seq_create_port(data->seq, pinfo);
+    snd_seq_port_info_set_name(dest_pinfo,  portName.c_str() );
+    data->vport = snd_seq_create_port(data->seq, dest_pinfo);
   
     if ( data->vport < 0 ) {
       errorString_ = "MidiInAlsa::openPort: ALSA error creating input port.";
@@ -1493,8 +1495,10 @@ void MidiInAlsa :: openPort( unsigned int portNumber, const std::string portName
     }
   }
 
-  receiver.port = data->vport;
-
+//  receiver.port = data->vport;
+  receiver.client = snd_seq_port_info_get_client( dest_pinfo );
+  receiver.port = snd_seq_port_info_get_port( dest_pinfo );
+  
   if ( !data->subscription ) {
     // Make subscription
     if (snd_seq_port_subscribe_malloc( &data->subscription ) < 0) {
@@ -1831,11 +1835,11 @@ void MidiOutAlsa :: sendMessage( std::vector<unsigned char> *message )
   snd_seq_ev_set_direct(&ev);
   for ( unsigned int i=0; i<nBytes; ++i ) data->buffer[i] = message->at(i);
   result = snd_midi_event_encode( data->coder, data->buffer, (long)nBytes, &ev );
-  if ( result < (int)nBytes ) {
-    errorString_ = "MidiOutAlsa::sendMessage: event parsing error!";
-    RtMidi::error( RtError::WARNING, errorString_ );
-    return;
-  }
+    if ( result < (int)nBytes ) {
+      errorString_ = "MidiOutAlsa::sendMessage: event parsing error!";
+      RtMidi::error( RtError::WARNING, errorString_ );
+      return;
+    }
 
   // Send the event.
   result = snd_seq_event_output(data->seq, &ev);

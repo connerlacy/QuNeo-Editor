@@ -1,5 +1,7 @@
 #include "midideviceaccess.h"
 #include <QDebug>
+#include <unistd.h>
+#include <stdlib.h>
 
 //sysEx array for querying the board's ID
 unsigned char checkFwSysExData[] = {
@@ -25,13 +27,12 @@ bool firmwareSent = true;
 //determines whether device has reconnected or not
 bool deviceReconnected = true;
 
-vector <RtMidiIn> inputs;
-
 // until we use c++11
 template <typename T, size_t N> T* begin(T(&arr)[N]) { return &arr[0]; }
 template <typename T, size_t N> T* end(T(&arr)[N]) { return &arr[0]+N; }
 
 //----Helper/convinience functons ----------------//
+void sendHugeSysex(RtMidiOut *midiOut, vector<unsigned char> message);
 void sendSysex(RtMidiOut *midiOut, vector<unsigned char> message);
 std::vector<pair<int, string > > enumeratePorts(RtMidiOut& midiOut);
 
@@ -102,11 +103,8 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     sysExFirmwareBytes = sysExFirmware->readAll();
     //qDebug() <<"sysex size:" << sysExFirmwareBytes.size();
 
-    //create new char array of the above byte array size
-//    sysExFirmwareData = new char[sysExFirmwareBytes.size()];
-
     //assign bytes to array, necessary for sending midi according to mac midi services
-//    sysExFirmwareData.insert(sysExFirmwareData.data(), )
+    sysExFirmwareData = vector<unsigned char>(sysExFirmwareBytes.data(), sysExFirmwareBytes.data() + sysExFirmwareBytes.size());
 
     //******* Load Preset SysEx Files ********//
     for(int i = 0; i<16; i++){
@@ -123,10 +121,8 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
         loadPresetData[i] = loadPresetBytes[i].data();
     }
 
-//    midiIn = new RtMidiIn(RtMidi::UNIX_JACK, "KMI-EDITOR");
-//    midiOut = new RtMidiOut(RtMidi::UNIX_JACK, "KMI-EDITOR");
-    midiIn = new RtMidiIn(RtMidi::LINUX_ALSA, "KMIEDITOR");
-    midiOut = new RtMidiOut(RtMidi::LINUX_ALSA, "KMIEDITOR");
+    midiIn = new RtMidiIn(RtMidi::LINUX_ALSA, "Q-Editor");
+    midiOut = new RtMidiOut(RtMidi::LINUX_ALSA, "Q-Editor");
     //get sources and dests, and store in vector
     getSourcesDests();
 
@@ -230,7 +226,7 @@ void MidiDeviceAccess::connectDevice(){ //makes a connection between a device an
 
     if(selectedDevice>-1)
     {
-        midiOut->openPort(selectedDevice, "kmiEditor");
+        midiOut->openPort(selectedDevice, "out");
         qDebug() << "opened output to " << QString::fromStdString(midiOut->getPortName(selectedDevice));
         //if source vector contains any QuNeo sources, then iterate through them and connect
         for(vector<pair<int,string> >::const_iterator src_device = quNeoSources.begin(); src_device != quNeoSources.end(); ++src_device)
@@ -238,13 +234,11 @@ void MidiDeviceAccess::connectDevice(){ //makes a connection between a device an
             //connect source to our client's input port
             //FIXME : will end on last port - this is only ok currently as we only allow one QUNEO 
             //to be attached.
-            qDebug() << "set listen on " <<  QString::fromStdString((*src_device).second);
-            midiIn->openPort((*src_device).first, "kmiEditor");
+            midiIn->openPort((*src_device).first, "in");
             midiIn->setCallback(&rtMidiCallback, callbackPointer);
             midiIn->ignoreTypes(false, true, true);
             
         }
-
         //if not in bootloader mode, send sysex check fw message upon device connection/selection
         if(!inBootloader){
             slotCheckFirmwareVersion();
@@ -346,66 +340,54 @@ void MidiDeviceAccess::slotUpdateFirmware(){//this function puts the board into 
 
 //    //if selected device...
 //    if(selectedDevice){
-
-//        //create new sysex event/request
-//        enterBootloaderSysExReq = new MIDISysexSendRequest;
-
-//        //currentSysExMessage = enterBootloaderSysExReq;
-
-//        //set event/request params
-//        enterBootloaderSysExReq->destination = selectedDevice;
-//        enterBootloaderSysExReq->data = (const Byte *)enterBootloaderData;
-//        enterBootloaderSysExReq->bytesToSend = 17;
-//        enterBootloaderSysExReq->complete = false;
-//        enterBootloaderSysExReq->completionProc = &sysExComplete;
-//        enterBootloaderSysExReq->completionRefCon = enterBootloaderData;
-
-//        //send the syesex data
-//        MIDISendSysex(enterBootloaderSysExReq);
-//        //qDebug() << "address of msg" << enterBootloaderSysExReq;
+//        vector<unsigned char> message(begin(enterBootloaderData), end(enterBootloaderData));
+//        sendSysex(midiOut, message);
+//        inBootloader = true;
 //    }
-
+//
 //    QTimer::singleShot(5000, callbackPointer, SLOT(slotDownloadFw()));
 }
 
 void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmware data**********
 
 //    if(selectedDevice){
-
+//        sendSysex(midiOut, sysExFirmwareData);
+//
 //        firmwareSent = false;
-
-//        //create new sysex event/request
-//        downloadFwSysExReq = new MIDISysexSendRequest;
-
-//        //set event/request params
-//        downloadFwSysExReq->destination = selectedDevice;
-//        downloadFwSysExReq->data = (const Byte *)sysExFirmwareData;
-//        downloadFwSysExReq->bytesToSend = sysExFirmwareBytes.size();
-//        downloadFwSysExReq->complete = false;
-//        downloadFwSysExReq->completionProc = &sysExComplete;
-//        downloadFwSysExReq->completionRefCon = sysExFirmwareData;
-
-//        //send the syesex data
-//        MIDISendSysex(downloadFwSysExReq);
-//        //qDebug() << "address of msg" << midiSysexSendRequest;
+//
+////        //create new sysex event/request
+////        downloadFwSysExReq = new MIDISysexSendRequest;
+//
+////        //set event/request params
+////        downloadFwSysExReq->destination = selectedDevice;
+////        downloadFwSysExReq->data = (const Byte *)sysExFirmwareData;
+////        downloadFwSysExReq->bytesToSend = sysExFirmwareBytes.size();
+////        downloadFwSysExReq->complete = false;
+////        downloadFwSysExReq->completionProc = &sysExComplete;
+////        downloadFwSysExReq->completionRefCon = sysExFirmwareData;
+//
+////        //send the syesex data
+////        MIDISendSysex(downloadFwSysExReq);
+////        //qDebug() << "address of msg" << midiSysexSendRequest;
+//          firmwareSent = true;
+//          qDebug("fw download sent!");
+//          inBootloader = false;
+//
+////    while(!downloadFwSysExReq->complete){
+////        bytesLeft = downloadFwSysExReq->bytesToSend;
+////        emit sigFwBytesLeft(bytesLeft);
+////    }
+//
+//    emit sigFwBytesLeft((0));
 //    }
-
-//    while(!downloadFwSysExReq->complete){
-//        bytesLeft = downloadFwSysExReq->bytesToSend;
-//        emit sigFwBytesLeft(bytesLeft);
-//    }
-
-//    //emit sigFwBytesLeft((0));
-
+//
 
 }
 
 void MidiDeviceAccess::slotCheckFirmwareVersion(){//this function checks versions with sysEx
-
     vector<unsigned char> message(begin(checkFwSysExData), end(checkFwSysExData));
     sendSysex(midiOut, message);
     qDebug("check fw sent");
-
 }
 
 void MidiDeviceAccess::slotSwapLeds(){
@@ -496,6 +478,19 @@ void rtMidiCallback( double deltatime, std::vector< unsigned char > *message, vo
 /*
  * RtMidi Helper Functions
  */
+void sendHugeSysex(RtMidiOut *midiOut, vector<unsigned char> message) {
+    char buffer [256];
+    int pos=0;
+    while ( pos + 1024 < message.size()) {
+        sendSysex(midiOut, vector<unsigned char>(message.begin() + pos, message.begin() + pos + 1024));
+        pos += 1024;
+        sprintf(buffer, "%d", pos);
+        qDebug(buffer);
+    }
+    sendSysex(midiOut, vector<unsigned char>(message.begin() + pos, message.end()));
+    
+    return;
+}
 void sendSysex(RtMidiOut *midiOut, vector<unsigned char> message) {
     try {
         midiOut->sendMessage(&message);
