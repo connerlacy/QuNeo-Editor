@@ -129,6 +129,14 @@ LIBS += -framework Cocoa
 LIBS += -framework CoreServices
 }
 
+unix:!macx{
+INCLUDEPATH += ./midi/rtmidi
+HEADERS += midi/rtmidi/midideviceaccess.h midi/rtmidi/RtMidi.h
+SOURCES  += midi/rtmidi/midideviceaccess.cpp midi/rtmidi/RtMidi.cpp
+LIBS += -lasound 
+LIBS += -lpthread
+DEFINES += __LINUX_ALSA__
+}
 
 
 #------OS Specific ICONS-------#
@@ -140,6 +148,10 @@ RC_FILE = quneoIcon.rc.txt
 }
 
 macx{
+ICON = darth_quneo_icon.icns
+}
+
+unix{
 ICON = darth_quneo_icon.icns
 }
 
