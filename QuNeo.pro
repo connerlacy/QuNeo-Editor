@@ -130,14 +130,11 @@ LIBS += -framework CoreServices
 }
 
 unix:!macx{
-QMAKE_CXXFLAGS += -std=c++0x -pthread
 INCLUDEPATH += ./midi/rtmidi
 HEADERS += midi/rtmidi/midideviceaccess.h midi/rtmidi/RtMidi.h
 SOURCES  += midi/rtmidi/midideviceaccess.cpp midi/rtmidi/RtMidi.cpp
-LIBS += -ljack 
 LIBS += -lasound 
-LIBS += -pthread
-DEFINES += __UNIX_JACK__
+LIBS += -lpthread
 DEFINES += __LINUX_ALSA__
 }
 
@@ -151,6 +148,10 @@ RC_FILE = quneoIcon.rc.txt
 }
 
 macx{
+ICON = darth_quneo_icon.icns
+}
+
+unix{
 ICON = darth_quneo_icon.icns
 }
 

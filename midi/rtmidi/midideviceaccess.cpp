@@ -338,7 +338,14 @@ void MidiDeviceAccess::slotLoadPreset() {
 void MidiDeviceAccess::slotUpdateFirmware(){//this function puts the board into bootloader mode************
 
 
-//    //if selected device...
+        msgBox.setText("This ALPHA version of Linux support in the QuNeo editor cannot update firmware. ");
+        msgBox.setInformativeText("Please use the manual amidi method.");
+        msgBox.setDefaultButton(QMessageBox::Ok);
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setWindowModality(Qt::NonModal);
+        int ret = msgBox.exec();
+    
+    //if selected device...
 //    if(selectedDevice){
 //        vector<unsigned char> message(begin(enterBootloaderData), end(enterBootloaderData));
 //        sendSysex(midiOut, message);
@@ -350,37 +357,36 @@ void MidiDeviceAccess::slotUpdateFirmware(){//this function puts the board into 
 
 void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmware data**********
 
-//    if(selectedDevice){
-//        sendSysex(midiOut, sysExFirmwareData);
-//
-//        firmwareSent = false;
-//
-////        //create new sysex event/request
-////        downloadFwSysExReq = new MIDISysexSendRequest;
-//
-////        //set event/request params
-////        downloadFwSysExReq->destination = selectedDevice;
-////        downloadFwSysExReq->data = (const Byte *)sysExFirmwareData;
-////        downloadFwSysExReq->bytesToSend = sysExFirmwareBytes.size();
-////        downloadFwSysExReq->complete = false;
-////        downloadFwSysExReq->completionProc = &sysExComplete;
-////        downloadFwSysExReq->completionRefCon = sysExFirmwareData;
-//
-////        //send the syesex data
-////        MIDISendSysex(downloadFwSysExReq);
-////        //qDebug() << "address of msg" << midiSysexSendRequest;
-//          firmwareSent = true;
-//          qDebug("fw download sent!");
-//          inBootloader = false;
-//
-////    while(!downloadFwSysExReq->complete){
-////        bytesLeft = downloadFwSysExReq->bytesToSend;
-////        emit sigFwBytesLeft(bytesLeft);
-////    }
-//
-//    emit sigFwBytesLeft((0));
+    if(selectedDevice){
+        firmwareSent = false;
+        sendSysex(midiOut, sysExFirmwareData);
+
+
+//        //create new sysex event/request
+//        downloadFwSysExReq = new MIDISysexSendRequest;
+
+//        //set event/request params
+//        downloadFwSysExReq->destination = selectedDevice;
+//        downloadFwSysExReq->data = (const Byte *)sysExFirmwareData;
+//        downloadFwSysExReq->bytesToSend = sysExFirmwareBytes.size();
+//        downloadFwSysExReq->complete = false;
+//        downloadFwSysExReq->completionProc = &sysExComplete;
+//        downloadFwSysExReq->completionRefCon = sysExFirmwareData;
+
+//        //send the syesex data
+//        MIDISendSysex(downloadFwSysExReq);
+//        //qDebug() << "address of msg" << midiSysexSendRequest;
+          firmwareSent = true;
+          qDebug("fw download sent!");
+          inBootloader = false;
+
+//    while(!downloadFwSysExReq->complete){
+//        bytesLeft = downloadFwSysExReq->bytesToSend;
+//        emit sigFwBytesLeft(bytesLeft);
 //    }
-//
+
+    }
+
 
 }
 
