@@ -130,12 +130,10 @@ LIBS += -framework CoreServices
 }
 
 unix:!macx{
-INCLUDEPATH += ./midi/rtmidi
-HEADERS += midi/rtmidi/midideviceaccess.h midi/rtmidi/RtMidi.h
-SOURCES  += midi/rtmidi/midideviceaccess.cpp midi/rtmidi/RtMidi.cpp
+INCLUDEPATH += ./midi/alsa
+HEADERS += midi/alsa/midideviceaccess.h 
+SOURCES  += midi/alsa/midideviceaccess.cpp 
 LIBS += -lasound 
-LIBS += -lpthread
-DEFINES += __LINUX_ALSA__
 }
 
 
