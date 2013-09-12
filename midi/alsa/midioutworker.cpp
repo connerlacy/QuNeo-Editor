@@ -5,7 +5,7 @@
  * Created on September 11, 2013, 9:15 PM
  */
 
-#include "MidiOutWorker.h"
+#include "midioutworker.h"
 
 MidiOutWorker::MidiOutWorker(int client, int port) {
 }
