@@ -121,7 +121,7 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
 // initialize alsa
     
       sequencerHandle = NULL;
-    if ( snd_seq_open( &sequencerHandle, "default", SND_SEQ_OPEN_OUTPUT, 0 ) < 0 )
+    if ( snd_seq_open( &sequencerHandle, "default", SND_SEQ_OPEN_INPUT|SND_SEQ_OPEN_OUTPUT, 0 ) < 0 )
       {
 //        emit errorMessage( tr( "Could not access ALSA." ), tr( "Please ensure ALSA is up and running." ) );
 //        return;
@@ -140,12 +140,16 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
 //      emit errorMessage( tr( "Could not create MIDI output port." ), tr( "Please check your ALSA installation." ) );
 //      return;
     }
+      int test = snd_seq_poll_descriptors_count(sequencerHandle, POLLIN);
+      qDebug("Initial poll descriptor count BEFORE %d",test);
     inPort = snd_seq_create_simple_port( sequencerHandle, "in", SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE, SND_SEQ_PORT_TYPE_APPLICATION );
     if ( outPort < 0 )
     {
 //      emit errorMessage( tr( "Could not create MIDI output port." ), tr( "Please check your ALSA installation." ) );
 //      return;
     }
+      test = snd_seq_poll_descriptors_count(sequencerHandle, POLLIN);
+      qDebug("Initial poll descriptor count AFTER %d",test);
     //get sources and dests, and store in vector
     getSourcesDests();
 

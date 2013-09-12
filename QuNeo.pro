@@ -131,8 +131,8 @@ LIBS += -framework CoreServices
 
 unix:!macx{
 INCLUDEPATH += ./midi/alsa
-HEADERS += midi/alsa/midideviceaccess.h 
-SOURCES  += midi/alsa/midideviceaccess.cpp 
+HEADERS += midi/alsa/midideviceaccess.h midi/alsa/midioutworker.h midi/alsa/midiinworker.h
+SOURCES  += midi/alsa/midideviceaccess.cpp midi/alsa/midioutworker.cpp midi/alsa/midiintworker.cpp
 LIBS += -lasound 
 }
 
