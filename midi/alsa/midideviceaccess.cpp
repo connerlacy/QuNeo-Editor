@@ -140,17 +140,31 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
 //      emit errorMessage( tr( "Could not create MIDI output port." ), tr( "Please check your ALSA installation." ) );
 //      return;
     }
-      int test = snd_seq_poll_descriptors_count(sequencerHandle, POLLIN);
-      qDebug("Initial poll descriptor count BEFORE %d",test);
     inPort = snd_seq_create_simple_port( sequencerHandle, "in", SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE, SND_SEQ_PORT_TYPE_APPLICATION );
     if ( outPort < 0 )
     {
 //      emit errorMessage( tr( "Could not create MIDI output port." ), tr( "Please check your ALSA installation." ) );
 //      return;
     }
-      test = snd_seq_poll_descriptors_count(sequencerHandle, POLLIN);
-      qDebug("Initial poll descriptor count AFTER %d",test);
+    // setup notifiers for messages ready
+    int npfd = snd_seq_poll_descriptors_count(sequencerHandle, POLLIN);
+    struct pollfd* pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
+    snd_seq_poll_descriptors(sequencerHandle, pfd, npfd, POLLIN|POLLOUT);
+    // todo what if there is more than one...
+    for(int x = 0;x < npfd;x++){
+        int alsaEventFd = pfd[x].fd;
+        QSocketNotifier*  notifier = new QSocketNotifier(alsaEventFd, QSocketNotifier::Read, this);
+        // fixme leaking notifiers!
+        connect(notifier, SIGNAL(activated(int)), this, SLOT(processInput()));
+    }
     //get sources and dests, and store in vector
+
+    workerThread = new QThread;
+    worker = new MidiOutWorker(sequencerHandle, outPort);
+    worker->moveToThread(workerThread);
+    connect(this, SIGNAL(sysex(QByteArray, int)), worker, SLOT(sendSysex(QByteArray,int)));
+    workerThread->start();
+
     getSourcesDests();
 
 
@@ -299,16 +313,9 @@ void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets 
             //encode current preset data
             sysExFormat->slotEncodePreset(i);
 
-            //create char array of the most recently encoded preset using sysExFormat
-            char *presetSysExData = new char(sysExFormat->presetSysExByteArray.size());
-
-            //assign sysExFormat data to char array
-            presetSysExData = sysExFormat->presetSysExByteArray.data();
-
             //if there is a selected device, send down preset data via sysex protocol
             if(selectedDevice){
-                vector<unsigned char> message(presetSysExData, presetSysExData + sysExFormat->presetSysExByteArray.size());
-                sendSysex(&message);
+                emit sysex(sysExFormat->presetSysExByteArray);
                 qDebug("check fw sent");
             }
         }
@@ -333,12 +340,11 @@ void MidiDeviceAccess::slotUpdateSinglePreset(){
         presetSysExData = sysExFormat->presetSysExByteArray.data();
 
         //if there is a selected device
-        if(selectedDevice){
-                vector<unsigned char> message(presetSysExData, presetSysExData + sysExFormat->presetSysExByteArray.size());
-                sendSysex(&message);
-                qDebug("Preset Sysex Sent - Current Preset");
+//        if(selectedDevice){
+            emit sysex(sysExFormat->presetSysExByteArray);
+            qDebug("Preset Sysex Sent - Current Preset");
 
-        }
+//        }
         //load the currently selected preset
         slotLoadPreset();
 //    }
@@ -354,8 +360,9 @@ void MidiDeviceAccess::slotLoadPreset() {
     //if there is a selected device
     if (selectedDevice) {
 
-        vector<unsigned char> message(loadPresetSysExData, loadPresetSysExData + loadPresetSize[currentPreset]);
-        sendSysex(&message);
+        // todo: function to generate this..
+        QByteArray message(loadPresetData[currentPreset], loadPresetSize[currentPreset]);
+        emit sysex(message);
         qDebug("Preset Sysex Sent - Current Preset");
 
     }
@@ -364,8 +371,8 @@ void MidiDeviceAccess::slotLoadPreset() {
 
 void MidiDeviceAccess::slotUpdateFirmware(){//this function puts the board into bootloader mode************
 //    if(selectedDevice){
-        vector<unsigned char> message(begin(enterBootloaderData), end(enterBootloaderData));
-        sendSysex(&message);
+//        QByteArray message(enterBootloaderData);
+//        emit sysex(message);
 //        inBootloader = true;
 //    }
 //
@@ -376,7 +383,7 @@ void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmwar
 
 //    if(selectedDevice){
         firmwareSent = false;
-        sendSysex(&sysExFirmwareData);
+        emit sysex(sysExFirmwareBytes);
         firmwareSent = true;
         qDebug("fw download sent!");
         inBootloader = false;
@@ -423,21 +430,61 @@ void MidiDeviceAccess::slotSendToggleProgramChangeInput(){
     sendSysex(&message);
 }
 
-void MidiDeviceAccess::processSysex(std::vector< unsigned char > *message) {
-    if (message->size() == 17 && message->at(3) == 6 && message->at(4) == 2) {
+
+//-------------------------------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------//
+//------------------------------------------------Midi Handling------------------------------------------//
+//-------------------------------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------//
+
+void MidiDeviceAccess::processInput() {
+    do {
+        snd_seq_event_input( sequencerHandle, &sequencerEvent );
+        // currently accessing the sequencerEvent directly, may want to change this to using encode/decode alsa funcs
+        if ( sequencerEvent->type == SND_SEQ_EVENT_SYSEX ) {
+            tempBuffer.append( QByteArray( (char *) sequencerEvent->data.ext.ptr, sequencerEvent->data.ext.len ) );
+
+            // ALSA splits sysex messages into chunks, currently of 256 max bytes in size
+            // Therefore the data needs collection before sending it to the main thread
+            if ( tempBuffer.startsWith( 0xF0 ) && tempBuffer.endsWith( 0xF7 ) )
+            {
+                //            emit eventArrived( tempBuffer );
+                processSysex(tempBuffer);
+                qDebug("Sysex Arrived");
+                tempBuffer.clear();
+            }
+            else
+            {
+                qDebug("Chunk Arrived");
+                //emit chunkArrived();
+            }
+        } else {
+            qDebug("non SysEx Arrived");
+//            unsigned int nBytes = message->size();
+//            for ( unsigned int i=0; i<nBytes; i++ ) {
+//                qDebug() << "Byte " << i << " = " << (int)message->at(i) << ", ";
+//            }
+        }
+        snd_seq_free_event( sequencerEvent );
+    } while ( snd_seq_event_input_pending( sequencerHandle, 0 ) > 0 );
+
+}
+
+void MidiDeviceAccess::processSysex(QByteArray message) {
+    if (message.size() == 17 && message.at(3) == 6 && message.at(4) == 2) {
         // firmware inquery response
 
-        qDebug() << "boot LSB" << message->at(12);
-        qDebug() << "boot MSB" << message->at(13);
-        qDebug() << "fw LSB" << message->at(14);
-        qDebug() << "fw MSB" << message->at(15);
+        qDebug() << "boot LSB" << (unsigned char) message.at(12);
+        qDebug() << "boot MSB" << (unsigned char) message.at(13);
+        qDebug() << "fw LSB" << (unsigned char) message.at(14);
+        qDebug() << "fw MSB" << (unsigned char) message.at(15);
 
 
         //set version vars from sysex message
-        bootloaderVersionLSB = message->at(12);
-        bootloaderVersionMSB = message->at(13);
-        fwVersionLSB = message->at(14);
-        fwVersionMSB = message->at(15);
+        bootloaderVersionLSB = (unsigned char)message.at(12);
+        bootloaderVersionMSB = (unsigned char)message.at(13);
+        fwVersionLSB = (unsigned char)message.at(14);
+        fwVersionMSB = (unsigned char)message.at(15);
 
         boardVersion = QString("%1.%2.%3").arg(fwVersionMSB / 16).arg(fwVersionMSB % 16).arg(fwVersionLSB);
         boardVersionBoot = QString("%1.%2").arg(bootloaderVersionMSB).arg(bootloaderVersionLSB);
@@ -460,60 +507,12 @@ void MidiDeviceAccess::processSysex(std::vector< unsigned char > *message) {
     }
 
 }
-//-------------------------------------------------------------------------------------------------------//
-//-------------------------------------------------------------------------------------------------------//
-//--------------------------------------------Callback Definitions---------------------------------------//
-//-------------------------------------------------------------------------------------------------------//
-//-------------------------------------------------------------------------------------------------------//
 
-void rtMidiCallback( double deltatime, std::vector< unsigned char > *message, void *userData )
-{
-    if(240 == (int)message->at(0)) {
-        ((MidiDeviceAccess*)userData)->processSysex(message);
-    } else {
-        // currently we ignore anything that is not sysex
-        unsigned int nBytes = message->size();
-        for ( unsigned int i=0; i<nBytes; i++ )
-          qDebug() << "Byte " << i << " = " << (int)message->at(i) << ", ";
-        if ( nBytes > 0 )
-          qDebug() << "stamp = " << deltatime ;
-        
-    }
-}
+
 
     
-void MidiDeviceAccess::sendSysex(vector<unsigned char>* message) {
-    snd_seq_event_t event;
-    // init the event
-    snd_seq_ev_clear(&event);
-    // set event source to output port
-    snd_seq_ev_set_source(&event, outPort);
-    // set to braodcast to subscribers to source port
-    snd_seq_ev_set_subs(&event);
-    // set for direct (non-queued) delivery
-    snd_seq_ev_set_direct(&event);
-    int bytesSent;
-
-    int err;
-    vector<unsigned char> chunk;
-    
-    // loop through the bytes of the message, sending each CHUNKSIZE block
-    for (unsigned int i = 0; i < message->size(); i++) {
-        chunk.push_back(message->at(i));
-        if (chunk.size() == CHUNKSIZE || chunk.back() == 0xF7) {
-            snd_seq_ev_set_sysex(&event, chunk.size(), &chunk.front());
-            if ((err = snd_seq_event_output_direct(sequencerHandle, &event)) < 0) {
-                // TODO: something in case of error
-                qDebug("Error occurred:%s", snd_strerror(err));
-                return;
-            }
-            bytesSent += chunk.size();
-            // TODO: update progress dialog if showing?
-//            usleep(chunk.size() * 352);
-            usleep(chunk.size() * 25);
-            chunk.clear();
-        }
-    }
+void MidiDeviceAccess::sendSysex(vector<unsigned char> *message) {
+    //emit sysex(message);
 }
 
 //void sysExComplete(MIDISysexSendRequest* request)

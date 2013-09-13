@@ -10,6 +10,7 @@
 #include <utility> // for pair
 #include <sysexformat.h>
 #include <alsa/asoundlib.h>
+#include "midioutworker.h"
 
 //#include "copypastehandler.h"
 
@@ -20,7 +21,6 @@ using std::string;
 class MidiDeviceAccess : public QObject
 {
     Q_OBJECT
-    static const unsigned int CHUNKSIZE = 256;
 
 public:
     explicit MidiDeviceAccess(QVariantMap*, QObject *parent = 0);
@@ -49,8 +49,16 @@ public:
     int currentPreset; //preset to update
 
     //--------ALSA Midi Services Vars--------//
+    QThread* workerThread;
+    MidiOutWorker* worker;
     snd_seq_t * sequencerHandle;
+    snd_seq_event_t* sequencerEvent;
+
     int outPort, inPort;
+    QByteArray tempBuffer;
+
+    QSocketNotifier* seqNotifier;
+
     
     vector<pair<int, string> > quNeoDests; //vector of endpoint destination references (our devices' input ports)
     vector<pair<int, string> > quNeoSources; //vector of endpoint source references (our devices' output ports)
@@ -76,8 +84,8 @@ public:
     QString editorVersionBoot;
     QString boardVersionBoot;
 
-    void processSysex(vector<unsigned char> *message);
-    void sendSysex(vector<unsigned char>* message);
+    void processSysex(QByteArray message);
+    void sendSysex(vector<unsigned char> *message);
 
 signals:
     void clearDeviceMenu(); //clears the device menu
@@ -87,6 +95,7 @@ signals:
     void sigUpdateAllPresetsCount(int);
     void sigSetVersions(QString, QString);
     void sigQuNeoConnected(bool);
+    void sysex(QByteArray message, int sysexCompleteId=0);
 
 public slots:
     void slotSetCurrentPreset(QString); //sets preset var internally
@@ -103,6 +112,7 @@ public slots:
 
     void slotSendToggleProgramChangeOutput();
     void slotSendToggleProgramChangeInput();
+    void processInput();
 
 };
 

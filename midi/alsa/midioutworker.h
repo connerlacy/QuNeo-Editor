@@ -9,17 +9,26 @@
 #define	MIDIOUTWORKER_H
 #include <QThread>
 #include <QtCore>
+#include "alsa/asoundlib.h"
+
+#define CHUNKSIZE 256
+
 class MidiOutWorker :public QObject {
     Q_OBJECT
 public:
-    MidiOutWorker(int client, int port); //message?
+    MidiOutWorker(snd_seq_t* sequencerHandle, int port); //message?
     MidiOutWorker(const MidiOutWorker& orig);
     virtual ~MidiOutWorker();
 signals:
+    void progress(int complete, int total);
+    void sysexComplete(int completeId);
+    void error(QString message);
 public slots:
     //Do the work
-    void work();
+    void sendSysex(QByteArray message, int completeId);
 private:
+    snd_seq_t* sequencerHandle;
+    int port;
 };
 
 #endif	/* MIDIOUTWORKER_H */
