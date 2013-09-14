@@ -20,7 +20,7 @@ public:
     MidiOutWorker(const MidiOutWorker& orig);
     virtual ~MidiOutWorker();
 signals:
-    void progress(int complete, int total);
+    void progress(int complete, int total, int completeId);
     void sysexComplete(int completeId);
     void error(QString message);
 public slots:

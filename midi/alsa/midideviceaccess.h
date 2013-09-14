@@ -15,7 +15,8 @@
 //#include "copypastehandler.h"
 
 #define DOWNLOAD_FIRMWARE 1
-#define NEXT_SYSEX 2
+#define ENTER_BOOTLOADER 2
+#define NEXT_SYSEX 4
 
 using std::vector;
 using std::pair;
@@ -121,6 +122,8 @@ public slots:
     void slotSendToggleProgramChangeOutput();
     void slotSendToggleProgramChangeInput();
     void processInput();
+    void sysExComplete(int completeId);
+    void midiOutProgress(int bytesSent, int toSend, int completeId);
 
 };
 

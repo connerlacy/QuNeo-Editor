@@ -163,6 +163,8 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     worker = new MidiOutWorker(sequencerHandle, outPort);
     worker->moveToThread(workerThread);
     connect(this, SIGNAL(sysex(QByteArray,int)), worker, SLOT(sendSysex(QByteArray,int)));
+    connect(worker, SIGNAL(sysexComplete(int)), this, SLOT(sysExComplete(int)));
+    connect(worker, SIGNAL(progress(int,int,int)), this, SLOT(midiOutProgress(int,int,int)));
     workerThread->start();
 
     getSourcesDests();
@@ -293,6 +295,7 @@ void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets 
 
 //    if(deviceMenu->currentText() == "QuNeo 1"){
         for(int i= 0; i< 16; i++){
+            emit sigUpdateAllPresetsCount(i);
 
             //encode current preset data
             sysExFormat->slotEncodePreset(i);
@@ -336,8 +339,7 @@ void MidiDeviceAccess::slotLoadPreset() {
 
 void MidiDeviceAccess::slotUpdateFirmware(){//this function puts the board into bootloader mode************
     if(-1 < selectedDevice){
-        emit sysex(QByteArray::fromRawData((char*)(enterBootloaderData), sizeof(enterBootloaderData)));
-        inBootloader = true;
+        emit sysex(QByteArray::fromRawData((char*)(enterBootloaderData), sizeof(enterBootloaderData)), ENTER_BOOTLOADER);
     }
 
     QTimer::singleShot(5000, callbackPointer, SLOT(slotDownloadFw()));
@@ -350,19 +352,7 @@ void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmwar
         connectDevice();
         firmwareSent = false;
         emit sysex(sysExFirmwareBytes, DOWNLOAD_FIRMWARE);
-        firmwareSent = true;
-        qDebug("fw download sent!");
-        inBootloader = false;
     }
-    // TODO:
-//    while(!downloadFwSysExReq->complete){
-//        bytesLeft = downloadFwSysExReq->bytesToSend;
-//        emit sigFwBytesLeft(bytesLeft);
-//    }
-
-//    }
-
-
 }
 
 void MidiDeviceAccess::slotCheckFirmwareVersion(){//this function checks versions with sysEx
@@ -472,26 +462,31 @@ void MidiDeviceAccess::processSysex(QByteArray message) {
 }
 
 
-
+void MidiDeviceAccess::midiOutProgress(int bytesSent, int toSend, int completeId){
+    if(DOWNLOAD_FIRMWARE == completeId) {
+        emit sigFwBytesLeft(toSend - bytesSent);
+    }
+}
     
-//void sysExComplete(MIDISysexSendRequest* request)
-//{
+void MidiDeviceAccess::sysExComplete(int completeId)
+{
 
-//    //called after sysex messages are completely sent
-//    if(request == enterBootloaderSysExReq)
-//    {
-//        inBootloader = true;
-//        //qDebug("enter bootloader sent");
-//    }
-//    else if(request == checkFwSysEx)
-//    {
-//        qDebug("check fw sent");
-//    }
-//    else if(request == downloadFwSysExReq)
-//    {
-//        firmwareSent = true;
-//        qDebug("fw download sent!");
-//        inBootloader = false;
-//    }
-//}
+    //called after sysex messages are completely sent
+    if(completeId == -1)
+    {
+        inBootloader = true;
+        //qDebug("enter bootloader sent");
+    }
+    else if(completeId == -2)
+    {
+        qDebug("check fw sent");
+    }
+    else if(completeId == DOWNLOAD_FIRMWARE)
+    {
+        firmwareSent = true;
+        qDebug("fw download sent!");
+        inBootloader = false;
+        connectDevice(true);
+    }
+}
 
