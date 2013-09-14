@@ -8,7 +8,6 @@
 unsigned char checkFwSysExData[] = {
     0xF0,0x7E,0x7F,0x06,0x01,0xF7
 };
-
 unsigned char swapLedsSysExData[] = {0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x02, 0x44, 0x5D, 0x00, 0x10, 0xF7};
 
 unsigned char toggleProgramChangeInSysExData[] = {0xF0, 0x00, 0x01, 0x5F, 0x7A, 0x1E, 0x00, 0x01, 0x00, 0x02, 0x50, 0x06, 0x04, 0x59, 0x00, 0x30, 0xF7};
@@ -60,12 +59,15 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     boardVersionBoot = QString("Not Connected");
     editorVersionBoot = QString("%1.%2").arg(versionArray[1]).arg(versionArray[0]);
 
+    boardVersion = QString("Not Connected");
+    boardVersionBoot = QString("Not Connected");
+
     sysExFormat = new SysExFormat(presetMapsCopy, 0); //create new instance of sysExFormat to format presets
 
     //find device menu, connect it, set initial slot to "None"
     deviceMenu = mainWindow->findChild<QComboBox *>("deviceMenu");
-    connect(deviceMenu, SIGNAL(currentIndexChanged(QString)), this, SLOT(slotSelectDevice(QString)));
-    deviceMenu->setEnabled(false);
+    connect(deviceMenu, SIGNAL(currentIndexChanged(int)), this, SLOT(slotSelectDevice(int)));
+    //deviceMenu->setEnabled(false);
     selectedDevice = -1;
 
     //initialize to preset 0, just like everything else, connect preset menu to gather preset num
@@ -100,9 +102,6 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     //read all data from file, and store in a QByteArray
     sysExFirmwareBytes = sysExFirmware->readAll();
     //qDebug() <<"sysex size:" << sysExFirmwareBytes.size();
-
-    //assign bytes to array, necessary for sending midi according to mac midi services
-    sysExFirmwareData = vector<unsigned char>(sysExFirmwareBytes.data(), sysExFirmwareBytes.data() + sysExFirmwareBytes.size());
 
     //******* Load Preset SysEx Files ********//
     for(int i = 0; i<16; i++){
@@ -153,16 +152,17 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     // todo what if there is more than one...
     for(int x = 0;x < npfd;x++){
         int alsaEventFd = pfd[x].fd;
+        // these should be cleaned up with parent (ie this!)
         QSocketNotifier*  notifier = new QSocketNotifier(alsaEventFd, QSocketNotifier::Read, this);
-        // fixme leaking notifiers!
         connect(notifier, SIGNAL(activated(int)), this, SLOT(processInput()));
     }
     //get sources and dests, and store in vector
 
+    // set up midi send worker thread
     workerThread = new QThread;
     worker = new MidiOutWorker(sequencerHandle, outPort);
     worker->moveToThread(workerThread);
-    connect(this, SIGNAL(sysex(QByteArray, int)), worker, SLOT(sendSysex(QByteArray,int)));
+    connect(this, SIGNAL(sysex(QByteArray,int)), worker, SLOT(sendSysex(QByteArray,int)));
     workerThread->start();
 
     getSourcesDests();
@@ -173,133 +173,117 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
 void MidiDeviceAccess::getSourcesDests()
 {
 
-    boardVersion = QString("Not Connected");
-    boardVersionBoot = QString("Not Connected");
-
-    sourceCount = 0;
-    destCount = 0;
+    unsigned int bits = SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ|SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE; //
 
     //clear source/dest vectors
-    quNeoSources.clear();
-    quNeoDests.clear();
+    quNeoPorts.clear();
 
-    //Sources
-//      sourceCount = midiIn->getPortCount();
-//
-//    for (int i = 0 ; i < sourceCount ; ++i)
-//    {
-//        string portName = midiIn->getPortName(i);
-//        std::transform(portName.begin(), portName.end(), portName.begin(), ::toupper);
-//        if(string::npos != portName.find("QUNEO")) {
-//            quNeoSources.push_back(pair<int, string>(i, portName));
-//        }
-//    }
+    snd_seq_client_info_t *cinfo;
+    snd_seq_port_info_t *pinfo;
 
-//    //Destinations (same procedure as above)
-//      destCount = midiOut->getPortCount();
-//
-//    for (int i = 0 ; i < destCount ; ++i)
-//    {
-//        string portName = midiOut->getPortName(i);
-//        std::transform(portName.begin(), portName.end(), portName.begin(), ::toupper);
-//        if(string::npos != portName.find("QUNEO")) {
-//            quNeoDests.push_back(pair<int, string>(i, portName));
-//        }
-//    }
+    snd_seq_client_info_alloca(&cinfo);
+    snd_seq_port_info_alloca(&pinfo);
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(sequencerHandle, cinfo) >= 0) {
+        /* reset query info */
+        snd_seq_port_info_set_client(pinfo, snd_seq_client_info_get_client(cinfo));
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(sequencerHandle, pinfo) >= 0) {
+            if((snd_seq_port_info_get_capability(pinfo) & (bits)) == (bits)){
+                // print_port
+                QString portName(snd_seq_port_info_get_name(pinfo));
+                if(portName.contains("QUNEO", Qt::CaseInsensitive)){
+                    int client = snd_seq_client_info_get_client(cinfo);
+                    int port = snd_seq_port_info_get_port(pinfo);
+                    QString clientName(snd_seq_client_info_get_name(cinfo));
+                    quNeoPorts.push_back(AlsaPort(client, port, clientName, portName));
+                    qDebug() << client << ":" << port << " - " << clientName << ":" << portName;
+                }
+
+            }
+        }
+    }
 
 //    //clear and repopulate device menu
     deviceMenu->clear();
 
-    //if there are any dests add them to the menu, here's where we might want to limit number
-    if(quNeoDests.size() == 0)
-    {
-
+    //if there are any dests add them to the menu
+    if(quNeoPorts.size() == 0) {
         //if not dests, put none in the menu
         deviceMenu->insertItem(0, QString("None"));
-
         emit sigQuNeoConnected(false);
-
-    }
-    else if(quNeoDests.size() > 1)
-    {
-
-        //MIDIRestart();
-        //getSourcesDests();
-
-
-        msgBox.setText("You have too many QuNeos plugged in.");
-        msgBox.setInformativeText("Please edit 1 QuNeo at a time.");
-        msgBox.setDefaultButton(QMessageBox::Ok);
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setWindowModality(Qt::NonModal);
-        int ret = msgBox.exec();
-
-        if(ret == QMessageBox::Ok)
-        {
-            qDebug() << "ok hit";
-
-            QTimer::singleShot(2000, this, SLOT(getSourcesDests()));
-        }
-
-    }
-    else
-    {
+    } else {
         //enumerate quneos in menu
-        for(std::vector<pair<int, string> >::const_iterator iterator = quNeoDests.begin(); iterator != quNeoDests.end(); ++iterator)
-        {
-            deviceMenu->insertItem((*iterator).first, QString::fromStdString((*iterator).second) );
+        for(vector<AlsaPort>::size_type i = 0; i < quNeoPorts.size(); i++) {
+            deviceMenu->insertItem(i, QString("%1:%2 QuNeo").arg(quNeoPorts[i].client).arg(quNeoPorts[i].port) );
             emit sigQuNeoConnected(true);
         }
     }
-    // emit sigSetVersions(editorVersion, boardVersion);
-
 }
 
 
-void MidiDeviceAccess::connectDevice(){ //makes a connection between a device and our app's i/o ports
+void MidiDeviceAccess::doConnect(bool connect, snd_seq_port_subscribe_t* subs)
+{
+    int error;
+    if(connect && (snd_seq_get_port_subscription(sequencerHandle, subs) < 0)) {
+        if ((error = snd_seq_subscribe_port(sequencerHandle, subs)) < 0) {
+            // emit error (snd_strerror(error))
+            qDebug() << "Alsa Error connecting send port" << snd_strerror(error) << endl;
+        }
+    } else if (!connect && (snd_seq_get_port_subscription(sequencerHandle, subs) == 0)){
+        if ((error = snd_seq_unsubscribe_port(sequencerHandle, subs)) < 0) {
+            // emit error (snd_strerror(error))
+            qDebug() << "Alsa Error connecting send port" << snd_strerror(error) << endl;
+        }
+    }
+}
+
+// make or break connection to selected device
+// @param connect true to connect, false to disconnect
+void MidiDeviceAccess::connectDevice(bool connect){
 
     qDebug() << "_____connectDevice() called_____";
 
-    // disconnect any open connections
-//    midiOut->closePort();
-//    midiIn->cancelCallback();
-//    midiIn->closePort();
-//
-//    if(selectedDevice>-1)
-//    {
-//        midiOut->openPort(selectedDevice, "out");
-//        qDebug() << "opened output to " << QString::fromStdString(midiOut->getPortName(selectedDevice));
-//        //if source vector contains any QuNeo sources, then iterate through them and connect
-//        for(vector<pair<int,string> >::const_iterator src_device = quNeoSources.begin(); src_device != quNeoSources.end(); ++src_device)
-//        {
-//            //connect source to our client's input port
-//            //FIXME : will end on last port - this is only ok currently as we only allow one QUNEO 
-//            //to be attached.
-//            midiIn->openPort((*src_device).first, "in");
-//            midiIn->setCallback(&rtMidiCallback, callbackPointer);
-//            midiIn->ignoreTypes(false, true, true);
-//            
-//        }
-//        //if not in bootloader mode, send sysex check fw message upon device connection/selection
-//        if(!inBootloader){
-//            slotCheckFirmwareVersion();
-//        }
-//    }
+    if(-1 < selectedDevice) {
+        snd_seq_addr_t device, inPortAddress, outPortAddress;
+
+        device.client = quNeoPorts[selectedDevice].client;
+        device.port = quNeoPorts[selectedDevice].port;
+
+        inPortAddress.client = outPortAddress.client = snd_seq_client_id(sequencerHandle);
+        inPortAddress.port = inPort;
+        outPortAddress.port = outPort;
+
+
+        qDebug() << "opened output to " << quNeoPorts[selectedDevice].client << ":" << quNeoPorts[selectedDevice].port << " - "<< quNeoPorts[selectedDevice].portName;
+
+        snd_seq_port_subscribe_t* subs;
+        snd_seq_port_subscribe_alloca(&subs);
+
+        //send port
+        snd_seq_port_subscribe_set_dest(subs, &device);
+        snd_seq_port_subscribe_set_sender(subs, &outPortAddress);
+        doConnect(connect, subs);
+
+        //recieve port
+        snd_seq_port_subscribe_set_dest(subs, &inPortAddress);
+        snd_seq_port_subscribe_set_sender(subs, &device);
+        doConnect(connect, subs);
+
+        //if not in bootloader mode, send sysex check fw message upon device connection/selection
+        if(!inBootloader){
+            slotCheckFirmwareVersion();
+        }
+    }
 }
 
-void MidiDeviceAccess::slotSelectDevice(QString index){
+void MidiDeviceAccess::slotSelectDevice(int index){
 
     qDebug() << "_____ slotSelectDevice() called_____" << index;
 
-    selectedDevice = -1;
+    connectDevice(false);
+    selectedDevice = (-1 < index && index < quNeoPorts.size()) ? index : -1;
     //if selected device contains QuNeo, then iterate through dests and assign index to selected device
-    if(index.contains(QString("QuNeo"), Qt::CaseInsensitive)){
-        for(vector<pair<int,string> >::const_iterator device = quNeoDests.begin(); device != quNeoDests.end(); ++device) {
-            if( 0==index.toStdString().compare((*device).second) ){
-                selectedDevice = (*device).first;
-            }
-        }
-    } 
     //after device selection connect device (regardless of whether selected device is NULL, this is taken care of in connectDevice())
     connectDevice();
 
@@ -314,9 +298,9 @@ void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets 
             sysExFormat->slotEncodePreset(i);
 
             //if there is a selected device, send down preset data via sysex protocol
-            if(selectedDevice){
+            if(-1 < selectedDevice){
                 emit sysex(sysExFormat->presetSysExByteArray);
-                qDebug("check fw sent");
+                qDebug("update preset %d", i);
             }
         }
 
@@ -328,66 +312,49 @@ void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets 
 
 void MidiDeviceAccess::slotUpdateSinglePreset(){
 
-//    if(deviceMenu->currentText() == "QuNeo 1"){
-
         //encode current preset
         sysExFormat->slotEncodePreset(currentPreset);
 
-        //create new char array using most recently encoded preset
-        char *presetSysExData = new char(sysExFormat->presetSysExByteArray.size());
-
-        //assign encoded data into char array
-        presetSysExData = sysExFormat->presetSysExByteArray.data();
-
         //if there is a selected device
-//        if(selectedDevice){
+        if(selectedDevice){
             emit sysex(sysExFormat->presetSysExByteArray);
             qDebug("Preset Sysex Sent - Current Preset");
 
-//        }
+        }
         //load the currently selected preset
         slotLoadPreset();
-//    }
 
 }
 
 void MidiDeviceAccess::slotLoadPreset() {
-
-
-    char* loadPresetSysExData = new char[loadPresetSize[currentPreset]];
-    loadPresetSysExData = loadPresetData[currentPreset];
-
-    //if there is a selected device
-    if (selectedDevice) {
-
+    if (-1 < selectedDevice) {
         // todo: function to generate this..
-        QByteArray message(loadPresetData[currentPreset], loadPresetSize[currentPreset]);
-        emit sysex(message);
+        emit sysex(loadPresetBytes[currentPreset]);
         qDebug("Preset Sysex Sent - Current Preset");
-
     }
-
 }
 
 void MidiDeviceAccess::slotUpdateFirmware(){//this function puts the board into bootloader mode************
-//    if(selectedDevice){
-//        QByteArray message(enterBootloaderData);
-//        emit sysex(message);
-//        inBootloader = true;
-//    }
-//
+    if(-1 < selectedDevice){
+        emit sysex(QByteArray::fromRawData((char*)(enterBootloaderData), sizeof(enterBootloaderData)));
+        inBootloader = true;
+    }
+
     QTimer::singleShot(5000, callbackPointer, SLOT(slotDownloadFw()));
 }
 
 void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmware data**********
 
-//    if(selectedDevice){
+    if(-1 < selectedDevice){
+        // will have disconnected with bootloader call
+        connectDevice();
         firmwareSent = false;
-        emit sysex(sysExFirmwareBytes);
+        emit sysex(sysExFirmwareBytes, DOWNLOAD_FIRMWARE);
         firmwareSent = true;
         qDebug("fw download sent!");
         inBootloader = false;
-
+    }
+    // TODO:
 //    while(!downloadFwSysExReq->complete){
 //        bytesLeft = downloadFwSysExReq->bytesToSend;
 //        emit sigFwBytesLeft(bytesLeft);
@@ -399,15 +366,13 @@ void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmwar
 }
 
 void MidiDeviceAccess::slotCheckFirmwareVersion(){//this function checks versions with sysEx
-    vector<unsigned char> message(begin(checkFwSysExData), end(checkFwSysExData));
-    sendSysex(&message);
+    emit sysex(QByteArray::fromRawData((char*)(checkFwSysExData), sizeof(checkFwSysExData)));
     qDebug("check fw sent");
 }
 
 void MidiDeviceAccess::slotSwapLeds(){
 
-    vector<unsigned char> message(begin(swapLedsSysExData), end(swapLedsSysExData));
-    sendSysex(&message);
+    emit sysex(QByteArray::fromRawData((char*)(swapLedsSysExData), sizeof(swapLedsSysExData)));
 }
 
 void MidiDeviceAccess::slotSetCurrentPreset(QString selected){
@@ -421,13 +386,11 @@ void MidiDeviceAccess::slotSetCurrentPreset(QString selected){
 }
 
 void MidiDeviceAccess::slotSendToggleProgramChangeOutput(){
-    vector<unsigned char> message(begin(toggleProgramChangeOutSysExData), end(toggleProgramChangeOutSysExData));
-    sendSysex(&message);
+    emit sysex(QByteArray::fromRawData((char*)(toggleProgramChangeOutSysExData), sizeof(toggleProgramChangeOutSysExData)));
 }
 
 void MidiDeviceAccess::slotSendToggleProgramChangeInput(){
-    vector<unsigned char> message(begin(toggleProgramChangeInSysExData), end(toggleProgramChangeInSysExData));
-    sendSysex(&message);
+    emit sysex(QByteArray::fromRawData((char*)(toggleProgramChangeInSysExData), sizeof(toggleProgramChangeInSysExData)));
 }
 
 
@@ -511,10 +474,6 @@ void MidiDeviceAccess::processSysex(QByteArray message) {
 
 
     
-void MidiDeviceAccess::sendSysex(vector<unsigned char> *message) {
-    //emit sysex(message);
-}
-
 //void sysExComplete(MIDISysexSendRequest* request)
 //{
 

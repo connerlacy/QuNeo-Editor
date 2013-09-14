@@ -45,7 +45,7 @@ void MidiOutWorker::sendSysex(QByteArray message, int completeId) {
             bytesSent += chunk.size();
             // TODO: update progress dialog if showing?
             //            usleep(chunk.size() * 352);
-            usleep(chunk.size() * 25);
+            usleep(chunk.size() * 128);
             chunk.clear();
             emit progress(bytesSent, message.size());
             qDebug("chunkSent %d", bytesSent);

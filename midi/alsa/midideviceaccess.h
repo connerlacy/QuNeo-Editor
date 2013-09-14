@@ -14,9 +14,13 @@
 
 //#include "copypastehandler.h"
 
+#define DOWNLOAD_FIRMWARE 1
+#define NEXT_SYSEX 2
+
 using std::vector;
 using std::pair;
 using std::string;
+
 
 class MidiDeviceAccess : public QObject
 {
@@ -30,7 +34,6 @@ public:
     QString pathSysex; //path of sysex firmware file in build
     QFile *sysExFirmware; //sysex firmware file
     QByteArray sysExFirmwareBytes; //sysex firmware as byte array
-    vector<unsigned char> sysExFirmwareData; //char array address for sysex firmware
 
     //---------Bootloader and Firmware Versioning vars--------//
     int fwVersionLSB; //stores LSB of FW version when query returns in slotProcessSysExRx(int);
@@ -59,16 +62,20 @@ public:
 
     QSocketNotifier* seqNotifier;
 
-    
-    vector<pair<int, string> > quNeoDests; //vector of endpoint destination references (our devices' input ports)
-    vector<pair<int, string> > quNeoSources; //vector of endpoint source references (our devices' output ports)
+    struct AlsaPort {
+        int client;
+        int port;
+        QString clientName;
+        QString portName;
+        AlsaPort() : client(-1), port(-1), clientName("non"), portName("non") {}
+        AlsaPort(int client, int port, QString clientName, QString portName) :client(client), port(port), clientName(clientName), portName(portName) {}
+    };
+
+    vector<AlsaPort> quNeoPorts; //vector of endpoint source references (our devices' output ports)
     int selectedDevice;
 
-    int sourceCount;
-    int destCount;
-
     //-----Internal helper functions, not necessary for SIGS/SLOTS---------//
-    void connectDevice(); //connects a single device
+    void connectDevice(bool connect=true); //connects a single device
 
     //------- Load Preset Files ------///
     QFile* loadPreset[16];
@@ -85,8 +92,9 @@ public:
     QString boardVersionBoot;
 
     void processSysex(QByteArray message);
-    void sendSysex(vector<unsigned char> *message);
 
+    void doConnect(snd_seq_port_subscribe_t* subs, int error, bool connect);
+    void doConnect(bool connect, snd_seq_port_subscribe_t* subs);
 signals:
     void clearDeviceMenu(); //clears the device menu
     void populateDeviceMenu(QStringList); //adds devices to device menu
@@ -95,11 +103,11 @@ signals:
     void sigUpdateAllPresetsCount(int);
     void sigSetVersions(QString, QString);
     void sigQuNeoConnected(bool);
-    void sysex(QByteArray message, int sysexCompleteId=0);
+    void sysex(QByteArray, int sysexCompleteId=0);
 
 public slots:
     void slotSetCurrentPreset(QString); //sets preset var internally
-    void slotSelectDevice(QString); //activates the selected device
+    void slotSelectDevice(int); //activates the selected device
     void slotUpdateAllPresets(); //will update all presets
     void slotUpdateSinglePreset(); //updates current preset
     void slotUpdateFirmware(); //puts board into bootloader mode, waits 5 seconds, then updates fw
