@@ -11,7 +11,7 @@
 #include <QtCore>
 #include "alsa/asoundlib.h"
 
-#define CHUNKSIZE 256
+#define CHUNKSIZE 128
 
 class MidiOutWorker :public QObject {
     Q_OBJECT

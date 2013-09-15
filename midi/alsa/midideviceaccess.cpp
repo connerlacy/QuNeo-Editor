@@ -21,9 +21,6 @@ unsigned char enterBootloaderData[] = {
 //var for determining if board has been set to bootloader mode
 bool inBootloader = false;
 
-//determines whether sysex message has been completely sent
-bool firmwareSent = true;
-
 //determines whether device has reconnected or not
 bool deviceReconnected = true;
 
@@ -256,8 +253,7 @@ void MidiDeviceAccess::connectDevice(bool connect){
         inPortAddress.port = inPort;
         outPortAddress.port = outPort;
 
-
-        qDebug() << "opened output to " << quNeoPorts[selectedDevice].client << ":" << quNeoPorts[selectedDevice].port << " - "<< quNeoPorts[selectedDevice].portName;
+        qDebug() << "connecting to " << quNeoPorts[selectedDevice].client << ":" << quNeoPorts[selectedDevice].port << " - "<< quNeoPorts[selectedDevice].portName;
 
         snd_seq_port_subscribe_t* subs;
         snd_seq_port_subscribe_alloca(&subs);
@@ -295,20 +291,18 @@ void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets 
 
 //    if(deviceMenu->currentText() == "QuNeo 1"){
         for(int i= 0; i< 16; i++){
-            emit sigUpdateAllPresetsCount(i);
 
             //encode current preset data
             sysExFormat->slotEncodePreset(i);
 
             //if there is a selected device, send down preset data via sysex protocol
             if(-1 < selectedDevice){
-                emit sysex(sysExFormat->presetSysExByteArray);
+                emit sysex(sysExFormat->presetSysExByteArray, (ALL_PRESETS_FLAG | (i+1)));
                 qDebug("update preset %d", i);
             }
         }
 
         slotLoadPreset();
-        emit sigUpdateAllPresetsCount(16);
 //    }
 
 }
@@ -319,7 +313,7 @@ void MidiDeviceAccess::slotUpdateSinglePreset(){
         sysExFormat->slotEncodePreset(currentPreset);
 
         //if there is a selected device
-        if(selectedDevice){
+        if(-1 < selectedDevice){
             emit sysex(sysExFormat->presetSysExByteArray);
             qDebug("Preset Sysex Sent - Current Preset");
 
@@ -341,17 +335,14 @@ void MidiDeviceAccess::slotUpdateFirmware(){//this function puts the board into 
     if(-1 < selectedDevice){
         emit sysex(QByteArray::fromRawData((char*)(enterBootloaderData), sizeof(enterBootloaderData)), ENTER_BOOTLOADER);
     }
-
     QTimer::singleShot(5000, callbackPointer, SLOT(slotDownloadFw()));
 }
 
 void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmware data**********
-
     if(-1 < selectedDevice){
         // will have disconnected with bootloader call
         inBootloader = true;
         connectDevice();
-        firmwareSent = false;
         emit sysex(sysExFirmwareBytes, DOWNLOAD_FIRMWARE);
     }
 }
@@ -362,7 +353,6 @@ void MidiDeviceAccess::slotCheckFirmwareVersion(){//this function checks version
 }
 
 void MidiDeviceAccess::slotSwapLeds(){
-
     emit sysex(QByteArray::fromRawData((char*)(swapLedsSysExData), sizeof(swapLedsSysExData)));
 }
 
@@ -372,7 +362,6 @@ void MidiDeviceAccess::slotSetCurrentPreset(QString selected){
             selected.remove(" *");
         }
         currentPreset = selected.remove(0,7).toInt() -1; //reduce string to number
-        //qDebug() << "Current Preset" << currentPreset;
     }
 }
 
@@ -427,12 +416,10 @@ void MidiDeviceAccess::processInput() {
 void MidiDeviceAccess::processSysex(QByteArray message) {
     if (message.size() == 17 && message.at(3) == 6 && message.at(4) == 2) {
         // firmware inquery response
-
         qDebug() << "boot LSB" << (unsigned char) message.at(12);
         qDebug() << "boot MSB" << (unsigned char) message.at(13);
         qDebug() << "fw LSB" << (unsigned char) message.at(14);
         qDebug() << "fw MSB" << (unsigned char) message.at(15);
-
 
         //set version vars from sysex message
         bootloaderVersionLSB = (unsigned char)message.at(12);
@@ -443,29 +430,20 @@ void MidiDeviceAccess::processSysex(QByteArray message) {
         boardVersion = QString("%1.%2.%3").arg(fwVersionMSB / 16).arg(fwVersionMSB % 16).arg(fwVersionLSB);
         boardVersionBoot = QString("%1.%2").arg(bootloaderVersionMSB).arg(bootloaderVersionLSB);
 
-        //qDebug() << "fw:" << fwVersionMSB << fwVersionLSB;
-        //qDebug() << "bootloader:" << bootloaderVersionMSB << bootloaderVersionLSB;
-
         //check version vars against version array
-        if (//versionArray[0] != bootloaderVersionLSB ||
-                //versionArray[1] != bootloaderVersionMSB ||
-                versionArray[2] != fwVersionLSB ||
+        if (versionArray[2] != fwVersionLSB ||
                 versionArray[3] != fwVersionMSB % 16 ||
                 versionArray[4] != fwVersionMSB / 16) {
             emit sigFirmwareCurrent(false);
-            //qDebug() << "version good" << false;
         } else {
-            //qDebug() << "version good" << true;
             emit sigFirmwareCurrent(true);
         }
     }
-
 }
 
 
 void MidiDeviceAccess::midiOutProgress(int bytesSent, int toSend, int completeId){
     if(DOWNLOAD_FIRMWARE == completeId) {
-
         emit sigFwBytesLeft(toSend - bytesSent);
     }
 }
@@ -474,17 +452,17 @@ void MidiDeviceAccess::sysExComplete(int completeId)
 {
 
     //called after sysex messages are completely sent
-    if(completeId == -1)
-    {
+    if(completeId == -1) {
         inBootloader = true;
-        //qDebug("enter bootloader sent");
-    }
-    else if(completeId == DOWNLOAD_FIRMWARE)
-    {
-        firmwareSent = true;
+        qDebug("entered bootloader");
+    } else if(completeId == DOWNLOAD_FIRMWARE) {
         qDebug("fw download sent!");
         inBootloader = false;
-        connectDevice(true);
+        QTimer::singleShot(2000, callbackPointer, SLOT(connectDevice()));
+
+    } else if ((completeId & ALL_PRESETS_FLAG) == ALL_PRESETS_FLAG) {
+        qDebug() << "preset completed:"<<(completeId ^ ALL_PRESETS_FLAG);
+        emit sigUpdateAllPresetsCount(completeId ^ ALL_PRESETS_FLAG);
     }
 }
 

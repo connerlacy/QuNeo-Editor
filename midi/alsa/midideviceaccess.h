@@ -16,7 +16,9 @@
 
 #define DOWNLOAD_FIRMWARE 1
 #define ENTER_BOOTLOADER 2
-#define NEXT_SYSEX 4
+// flags - combined with first byte for values
+#define ALL_PRESETS_FLAG 0x100
+
 
 using std::vector;
 using std::pair;
@@ -75,17 +77,11 @@ public:
     vector<AlsaPort> quNeoPorts; //vector of endpoint source references (our devices' output ports)
     int selectedDevice;
 
-    //-----Internal helper functions, not necessary for SIGS/SLOTS---------//
-    void connectDevice(bool connect=true); //connects a single device
-
     //------- Load Preset Files ------///
     QFile* loadPreset[16];
     QByteArray loadPresetBytes[16];
     char *loadPresetData[16];
     int loadPresetSize[16];
-
-
-    QMessageBox msgBox; //for too many quneos message
 
     QString editorVersion;
     QString boardVersion;
@@ -93,8 +89,6 @@ public:
     QString boardVersionBoot;
 
     void processSysex(QByteArray message);
-
-    void doConnect(snd_seq_port_subscribe_t* subs, int error, bool connect);
     void doConnect(bool connect, snd_seq_port_subscribe_t* subs);
 signals:
     void clearDeviceMenu(); //clears the device menu
@@ -124,6 +118,7 @@ public slots:
     void processInput();
     void sysExComplete(int completeId);
     void midiOutProgress(int bytesSent, int toSend, int completeId);
+    void connectDevice(bool connect=true); //connects a single device
 
 };
 
