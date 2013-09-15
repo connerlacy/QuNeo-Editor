@@ -26,7 +26,7 @@ void MidiOutWorker::sendSysex(QByteArray message, int completeId) {
     snd_seq_ev_set_subs(&event);
     // set for direct (non-queued) delivery
     snd_seq_ev_set_direct(&event);
-    int bytesSent;
+    int bytesSent = 0;
 
     int err;
     std::vector<unsigned char> chunk;
@@ -45,13 +45,15 @@ void MidiOutWorker::sendSysex(QByteArray message, int completeId) {
             bytesSent += chunk.size();
             // TODO: update progress dialog if showing?
             //            usleep(chunk.size() * 352);
+            qDebug("emitting progress %d %d %d", bytesSent, message.size(), completeId);
+            emit progress(bytesSent, message.size(), completeId);
             usleep(chunk.size() * 352);
             chunk.clear();
-            emit progress(bytesSent, message.size(), completeId);
-            usleep(1000);
-            qDebug("chunkSent %d", bytesSent);
         }
     }
+    // 1/10th of a second
+    usleep(100000);
+    qDebug("emitting sysexComplete");
     emit sysexComplete(completeId);
 }
 

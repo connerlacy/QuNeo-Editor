@@ -349,6 +349,7 @@ void MidiDeviceAccess::slotDownloadFw(){//this function sends the actual firmwar
 
     if(-1 < selectedDevice){
         // will have disconnected with bootloader call
+        inBootloader = true;
         connectDevice();
         firmwareSent = false;
         emit sysex(sysExFirmwareBytes, DOWNLOAD_FIRMWARE);
@@ -464,6 +465,7 @@ void MidiDeviceAccess::processSysex(QByteArray message) {
 
 void MidiDeviceAccess::midiOutProgress(int bytesSent, int toSend, int completeId){
     if(DOWNLOAD_FIRMWARE == completeId) {
+
         emit sigFwBytesLeft(toSend - bytesSent);
     }
 }
@@ -476,10 +478,6 @@ void MidiDeviceAccess::sysExComplete(int completeId)
     {
         inBootloader = true;
         //qDebug("enter bootloader sent");
-    }
-    else if(completeId == -2)
-    {
-        qDebug("check fw sent");
     }
     else if(completeId == DOWNLOAD_FIRMWARE)
     {
