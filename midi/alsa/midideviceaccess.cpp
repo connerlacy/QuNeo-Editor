@@ -114,46 +114,51 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
         loadPresetData[i] = new char[loadPresetSize[i]];
         loadPresetData[i] = loadPresetBytes[i].data();
     }
-// initialize alsa
-    
-      sequencerHandle = NULL;
-    if ( snd_seq_open( &sequencerHandle, "default", SND_SEQ_OPEN_INPUT|SND_SEQ_OPEN_OUTPUT, 0 ) < 0 )
-      {
-//        emit errorMessage( tr( "Could not access ALSA." ), tr( "Please ensure ALSA is up and running." ) );
-//        return;
-      }
 
-    if ( sequencerHandle == NULL )
-      {
-//        emit errorMessage( tr( "Could not create MIDI output port." ), tr( "Please check your ALSA installation." ) );
-//        return;
-      }
+    // initialize alsa
+    sequencerHandle = NULL;
+    if ( snd_seq_open( &sequencerHandle, "default", SND_SEQ_OPEN_INPUT|SND_SEQ_OPEN_OUTPUT, 0 ) < 0 ) {
+        debug() << "Unable to access ALSA";
+        return;
+    }
+
+    if ( sequencerHandle == NULL ) {
+        debug() << "ALSA returned null handle";
+        return;
+    }
 
     snd_seq_set_client_name( sequencerHandle, "QuNeo Preset Editor" );
-    outPort = snd_seq_create_simple_port( sequencerHandle, "out", SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ, SND_SEQ_PORT_TYPE_APPLICATION );
-    if ( outPort < 0 )
-    {
-//      emit errorMessage( tr( "Could not create MIDI output port." ), tr( "Please check your ALSA installation." ) );
-//      return;
+
+    outPort = snd_seq_create_simple_port(
+                sequencerHandle,
+                "out",
+                SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ,
+                SND_SEQ_PORT_TYPE_APPLICATION
+                );
+    if ( outPort < 0 ) {
+        debug() << "Unable to create ALSA midi port";
+        return;
     }
-    inPort = snd_seq_create_simple_port( sequencerHandle, "in", SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE, SND_SEQ_PORT_TYPE_APPLICATION );
-    if ( outPort < 0 )
-    {
-//      emit errorMessage( tr( "Could not create MIDI output port." ), tr( "Please check your ALSA installation." ) );
-//      return;
+    inPort = snd_seq_create_simple_port(
+                sequencerHandle,
+                "in",
+                SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
+                SND_SEQ_PORT_TYPE_APPLICATION
+                );
+    if ( outPort < 0 ) {
+        debug() << "Unable to create ALSA midi port";
+        return;
     }
     // setup notifiers for messages ready
     int npfd = snd_seq_poll_descriptors_count(sequencerHandle, POLLIN);
     struct pollfd* pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
     snd_seq_poll_descriptors(sequencerHandle, pfd, npfd, POLLIN|POLLOUT);
-    // todo what if there is more than one...
     for(int x = 0;x < npfd;x++){
         int alsaEventFd = pfd[x].fd;
         // these should be cleaned up with parent (ie this!)
         QSocketNotifier*  notifier = new QSocketNotifier(alsaEventFd, QSocketNotifier::Read, this);
         connect(notifier, SIGNAL(activated(int)), this, SLOT(processInput()));
     }
-    //get sources and dests, and store in vector
 
     // set up midi send worker thread
     workerThread = new QThread;
@@ -165,8 +170,6 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     workerThread->start();
 
     getSourcesDests();
-
-
 }
 
 void MidiDeviceAccess::getSourcesDests()
@@ -203,20 +206,20 @@ void MidiDeviceAccess::getSourcesDests()
         }
     }
 
-//    //clear and repopulate device menu
+    //clear and repopulate device menu
     deviceMenu->clear();
 
     //if there are any dests add them to the menu
     if(quNeoPorts.size() == 0) {
-        //if not dests, put none in the menu
+        //if not dests, put "none" in the menu
         deviceMenu->insertItem(0, QString("None"));
         emit sigQuNeoConnected(false);
     } else {
         //enumerate quneos in menu
         for(vector<AlsaPort>::size_type i = 0; i < quNeoPorts.size(); i++) {
             deviceMenu->insertItem(i, QString("%1:%2 QuNeo").arg(quNeoPorts[i].client).arg(quNeoPorts[i].port) );
-            emit sigQuNeoConnected(true);
         }
+        emit sigQuNeoConnected(true);
     }
 }
 
@@ -237,8 +240,6 @@ void MidiDeviceAccess::doConnect(bool connect, snd_seq_port_subscribe_t* subs)
     }
 }
 
-// make or break connection to selected device
-// @param connect true to connect, false to disconnect
 void MidiDeviceAccess::connectDevice(bool connect){
 
     qDebug() << "_____connectDevice() called_____";
@@ -281,17 +282,13 @@ void MidiDeviceAccess::slotSelectDevice(int index){
 
     connectDevice(false);
     selectedDevice = (-1 < index && index < quNeoPorts.size()) ? index : -1;
-    //if selected device contains QuNeo, then iterate through dests and assign index to selected device
-    //after device selection connect device (regardless of whether selected device is NULL, this is taken care of in connectDevice())
     connectDevice();
 
 }
 
 void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets at once
 
-//    if(deviceMenu->currentText() == "QuNeo 1"){
         for(int i= 0; i< 16; i++){
-
             //encode current preset data
             sysExFormat->slotEncodePreset(i);
 
@@ -301,10 +298,7 @@ void MidiDeviceAccess::slotUpdateAllPresets() { //used for updating all presets 
                 qDebug("update preset %d", i);
             }
         }
-
         slotLoadPreset();
-//    }
-
 }
 
 void MidiDeviceAccess::slotUpdateSinglePreset(){
@@ -379,7 +373,6 @@ void MidiDeviceAccess::slotSendToggleProgramChangeInput(){
 //------------------------------------------------Midi Handling------------------------------------------//
 //-------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------------------------------------------------------//
-
 void MidiDeviceAccess::processInput() {
     do {
         snd_seq_event_input( sequencerHandle, &sequencerEvent );
@@ -391,7 +384,7 @@ void MidiDeviceAccess::processInput() {
             // Therefore the data needs collection before sending it to the main thread
             if ( tempBuffer.startsWith( 0xF0 ) && tempBuffer.endsWith( 0xF7 ) )
             {
-                //            emit eventArrived( tempBuffer );
+                // buffer contains complete sysex message - process it
                 processSysex(tempBuffer);
                 qDebug("Sysex Arrived");
                 tempBuffer.clear();
@@ -399,14 +392,12 @@ void MidiDeviceAccess::processInput() {
             else
             {
                 qDebug("Chunk Arrived");
-                //emit chunkArrived();
             }
         } else {
             qDebug("non SysEx Arrived");
-//            unsigned int nBytes = message->size();
-//            for ( unsigned int i=0; i<nBytes; i++ ) {
-//                qDebug() << "Byte " << i << " = " << (int)message->at(i) << ", ";
-//            }
+            // empty buffer - any interrupted sysex is invalid
+            tempBuffer.clear();
+            // TODO: add processing of non-sysex message
         }
         snd_seq_free_event( sequencerEvent );
     } while ( snd_seq_event_input_pending( sequencerHandle, 0 ) > 0 );
@@ -441,7 +432,11 @@ void MidiDeviceAccess::processSysex(QByteArray message) {
     }
 }
 
-
+//-------------------------------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------//
+//--Slots for handling status signals from MidiOutWorker ------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------//
 void MidiDeviceAccess::midiOutProgress(int bytesSent, int toSend, int completeId){
     if(DOWNLOAD_FIRMWARE == completeId) {
         emit sigFwBytesLeft(toSend - bytesSent);

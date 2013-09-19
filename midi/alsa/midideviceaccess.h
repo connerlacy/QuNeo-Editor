@@ -74,7 +74,7 @@ public:
         AlsaPort(int client, int port, QString clientName, QString portName) :client(client), port(port), clientName(clientName), portName(portName) {}
     };
 
-    vector<AlsaPort> quNeoPorts; //vector of endpoint source references (our devices' output ports)
+    vector<AlsaPort> quNeoPorts; //vector of endpoint source references (our devices' ports)
     int selectedDevice;
 
     //------- Load Preset Files ------///
@@ -118,7 +118,11 @@ public slots:
     void processInput();
     void sysExComplete(int completeId);
     void midiOutProgress(int bytesSent, int toSend, int completeId);
-    void connectDevice(bool connect=true); //connects a single device
+    /**
+     * make or break connection to selected device
+     * @param connect true to connect, false to disconnect
+     */
+    void connectDevice(bool connect=true);
 
 };
 
