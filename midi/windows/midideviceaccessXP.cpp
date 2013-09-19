@@ -27,7 +27,7 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     currentPreset = 0;
     versionArray[0] = 3;
     versionArray[1] = 1;
-    versionArray[2] = 19;
+    versionArray[2] = 24;
     versionArray[3] = 2;
     versionArray[4] = 1;
 
