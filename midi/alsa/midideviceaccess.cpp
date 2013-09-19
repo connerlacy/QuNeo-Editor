@@ -118,12 +118,12 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     // initialize alsa
     sequencerHandle = NULL;
     if ( snd_seq_open( &sequencerHandle, "default", SND_SEQ_OPEN_INPUT|SND_SEQ_OPEN_OUTPUT, 0 ) < 0 ) {
-        debug() << "Unable to access ALSA";
+        qDebug() << "Unable to access ALSA";
         return;
     }
 
     if ( sequencerHandle == NULL ) {
-        debug() << "ALSA returned null handle";
+        qDebug() << "ALSA returned null handle";
         return;
     }
 
@@ -136,7 +136,7 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
                 SND_SEQ_PORT_TYPE_APPLICATION
                 );
     if ( outPort < 0 ) {
-        debug() << "Unable to create ALSA midi port";
+        qDebug() << "Unable to create ALSA midi port";
         return;
     }
     inPort = snd_seq_create_simple_port(
@@ -146,7 +146,7 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
                 SND_SEQ_PORT_TYPE_APPLICATION
                 );
     if ( outPort < 0 ) {
-        debug() << "Unable to create ALSA midi port";
+        qDebug() << "Unable to create ALSA midi port";
         return;
     }
     // setup notifiers for messages ready
