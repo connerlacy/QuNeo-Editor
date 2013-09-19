@@ -154,15 +154,16 @@ MainWindow::MainWindow(QWidget *parent) :
     presetHandler->sensorList.append(QString("lSliderButton0"));
 
     //mac progress bar...
-#ifdef Q_OS_MAC
+#if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     totalFwBytes = midiDeviceAccess->sysExFirmwareBytes.size();
     progress = new QProgressDialog("Updating Firmware...", "Cancel", 0, totalFwBytes, this);
     connect(midiDeviceAccess, SIGNAL(sigFwBytesLeft(int)), this, SLOT(slotUpdateFwProgressDialog(int)));
     progress->setWindowModality(Qt::WindowModal);
     progress->setCancelButton(0);
-
+#ifndef Q_OS_LINUX
     //************ THIS SHOULD BE DONE LAST, AFTER APP IS "CONSTRUCTED" / LOADED ****************//
     midiDeviceAccess->getSourcesDests(); //populate midi devices
+#endif
 
 #else
     //windows progress bar...
@@ -170,13 +171,13 @@ MainWindow::MainWindow(QWidget *parent) :
     progress = new QProgressDialog("Updating Firmware...", "Cancel", 0, 0, this);
     progress->setWindowModality(Qt::WindowModal);
     progress->setCancelButton(0);
-
+#endif
+#ifndef Q_OS_MAC
     //windows edit pane fonts
     QGroupBox* gb = this->findChild<QGroupBox *>(QString("groupBox"));
     gb->setStyleSheet("QLabel { font: 10px } QLineEdit { font: 8px } QCheckBox {font:9px} QSpinBox {font: 10px} QDoubleSpinBox {font: 10px} QComboBox {font: 10px}");
     QLineEdit* qle = this->findChild<QLineEdit *>(QString("presetName"));
     qle->setStyleSheet("QLineEdit {font:8px}");
-
 #endif
 
 }
