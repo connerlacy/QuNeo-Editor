@@ -41,7 +41,7 @@ MidiDeviceAccess::MidiDeviceAccess(QVariantMap* presetMapsCopy,QObject *parent) 
     //these array vals should be set to the most recent fw and bootloader version
     versionArray[0] = 3; //bootloader LSB
     versionArray[1] = 1; //booloader MSB
-    versionArray[2] = 19; //fw LSB
+    versionArray[2] = 24; //fw LSB
     versionArray[3] = 2; //fw MSB 2
     versionArray[4] = 1; //fw MSB 1
 
