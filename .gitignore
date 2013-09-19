@@ -3,3 +3,5 @@
 /presets/QuNeo.json
 /Makefile
 /presets/QuNeo_FactoryPresets.json
+QuNeo.pro.user
+moc_*
